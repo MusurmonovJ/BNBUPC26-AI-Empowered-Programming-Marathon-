@@ -11,6 +11,10 @@ Checked on 13 October 2026 for the three-minute film and playable episode releas
 - A missing favicon request found during capture was fixed with an empty favicon declaration, preserving the interface's no-icons rule.
 - Fresh screenshots cover the opening, quotation, planting, tending, quiet seed, ghost rooftop and ending.
 - The npm audit of production dependencies reported zero vulnerabilities.
+- The production site at `https://lethe-nine.vercel.app` was checked anonymously after deployment. Its full three-minute film completed with no runtime exceptions or failed requests. The homepage, client assets and preview image returned 200; invalid tagging input returned 400 and the configured Groq endpoint returned valid tags with 200.
+- Public probes for local environment files, Git metadata, private QA and presentation artifacts returned 404. No locally configured secret values were found in the deployed client.
+
+The deployed application comes from commit `80a98c3`. The subsequent changes to this report and the recording guide are documentation only. Both repositories contain matching release file trees, with their existing branch histories preserved.
 
 ## Repository hygiene
 

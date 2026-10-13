@@ -85,7 +85,7 @@ If anything is harsh, too loud, too long or too dull, describe it in words ("the
 **The film** is the garden's own: nothing to steer, so the take is about stillness.
 1. Open the clean window from §1 (it opens `?demo=film`). Rest the cursor in the empty sky, top right.
 2. Start recording, click once where the cursor rests, then **touch nothing**: any click, key or scroll stops the film. Hiding the window pauses it rather than skipping beats.
-3. Stop recording about five seconds after "Lethe — a garden that forgets." has appeared (about 3:06 after the click).
+3. Let the film finish before stopping. The title "Lethe — a garden that forgets." appears near the end; the film holds it, then finishes around 3:01 after the click once the scene is ready. If the submission limit is exactly three minutes, trim the initial threshold and loading frames so the video begins with the first film title and retains the complete ending. Avoid extra narration before or after that cut.
 
 | film time | act | beat | words |
 |---|---|---|---|
