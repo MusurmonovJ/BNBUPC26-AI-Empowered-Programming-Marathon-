@@ -24,11 +24,12 @@ export function Reveal() {
   const garden = useGarden((s) => s.garden);
   const views = useGarden((s) => s.views);
   const now = useGarden((s) => s.now);
+  const presented = useGarden((s) => !!s.presentation.holderId);
   const { selectHolder, closeReveal } = useGarden.getState();
   // Re-rank whenever vitality changes (views), not only when the garden does.
   const ranked = useMemo(() => holders(garden, now()).slice(0, MAX_HOLDERS), [garden, views, now]);
 
-  if (!reveal.open) return null;
+  if (!reveal.open) return presented ? <RevealLabels /> : null;
   const strongest = ranked[0]?.weight || 1;
   return (
     <>
@@ -68,7 +69,7 @@ export function revealLabel(m: Memory): string {
 }
 
 function RevealLabels() {
-  const held = useRevealHeld() ?? [];
+  const held = (useRevealHeld() ?? []).slice(0, 7);
   const garden = useGarden((s) => s.garden);
   const labels = useRef(new Map<string, HTMLSpanElement>());
   /** Labels already placed this frame, so the next one can keep clear of them. */

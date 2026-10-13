@@ -38,6 +38,9 @@ export type FlowerUniforms = {
   uDetach: { value: number };
   /** Dissolve: a one-shot scatter of the particles (0 → 1); −1 means the usual slow lost-state drift. */
   uScatter: { value: number };
+  /** Ghost petals falling: seconds this flower has looked like a ghost (−1 when it doesn't), and when its first petal goes. */
+  uFallT: { value: number };
+  uFallFirst: { value: number };
 };
 
 export function makeUniforms(height: number, head = new THREE.Vector2()): FlowerUniforms {
@@ -49,6 +52,7 @@ export function makeUniforms(height: number, head = new THREE.Vector2()): Flower
     uPixelRatio: { value: 1 },
     uGrow: { value: 1 }, uUnfold: { value: 1 }, uHead: { value: head.clone() },
     uDetach: { value: 0 }, uScatter: { value: -1 },
+    uFallT: { value: -1 }, uFallFirst: { value: 6 },
   };
 }
 
@@ -76,6 +80,26 @@ vec3 grow(vec3 p, float part) {
   return p;
 }`;
 
+/**
+ * Ghost petals falling (scene-spec § Flowers): a ghost lets one petal go every ~20s until 40% have gone. The petal
+ * sinks to the ground over 7s, swaying a little, and has faded before it gets there. aFall is its turn, or −1.
+ */
+const FALL = /* glsl */ `
+uniform float uFallT, uFallFirst;
+#define FALL_EVERY 20.0
+#define FALL_TAKES 7.0
+float fallOf(float turn) {
+  if (turn < 0.0 || uFallT < 0.0) return 0.0;
+  return clamp((uFallT - uFallFirst - turn * FALL_EVERY) / FALL_TAKES, 0.0, 1.0);
+}
+vec3 fall(vec3 p, float f, float turn) {
+  if (f <= 0.0) return p;
+  p.y -= f * f * (uHead.y + 0.1);
+  p.x += sin(f * 4.5 + turn * 1.7) * 0.09 * f + (mod(turn, 2.0) - 0.5) * 0.3 * f;
+  p.z += 0.08 * f;
+  return p;
+}`;
+
 /** Bloom growth in the fragment: stems and leaves appear from the ground up; petals fade in as they open. */
 const REVEAL = /* glsl */ `
 uniform float uGrow, uHeight, uDetach;
@@ -94,21 +118,22 @@ const GLOW_DEFINES = /* glsl */ `
 
 const fillShader = {
   vertexShader: /* glsl */ `
-    attribute float aPart, aAlpha, aSolidOnly;
-    varying float vPart, vAlpha, vSolidOnly, vY;
+    attribute float aPart, aAlpha, aSolidOnly, aFall;
+    varying float vPart, vAlpha, vSolidOnly, vY, vFall;
     ${BEND}
     ${GROW}
+    ${FALL}
     void main() {
-      vPart = aPart; vAlpha = aAlpha; vSolidOnly = aSolidOnly; vY = position.y;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(bend(grow(position, aPart)), 1.0);
+      vPart = aPart; vAlpha = aAlpha; vSolidOnly = aSolidOnly; vY = position.y; vFall = fallOf(aFall);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(fall(bend(grow(position, aPart)), vFall, aFall), 1.0);
     }`,
   fragmentShader: /* glsl */ `${GLOW_DEFINES}
     uniform vec3 uColor, uStem, uLight;
     uniform float uFill, uLeafFill, uSolid, uGlow, uOpacity, uUnfold;
-    varying float vPart, vAlpha, vSolidOnly, vY;
+    varying float vPart, vAlpha, vSolidOnly, vY, vFall;
     ${REVEAL}
     void main() {
-      float shown = reveal(vPart, vY);
+      float shown = reveal(vPart, vY) * (1.0 - smoothstep(0.5, 0.95, vFall));
       if (shown <= 0.0) discard;
       vec3 col; float a;
       if (vPart < 0.5) { col = uColor; a = uFill * vAlpha; }
@@ -125,21 +150,22 @@ const fillShader = {
 
 const lineShader = {
   vertexShader: /* glsl */ `
-    attribute float aPart, aAlpha;
-    varying float vPart, vAlpha, vY;
+    attribute float aPart, aAlpha, aFall;
+    varying float vPart, vAlpha, vY, vFall;
     ${BEND}
     ${GROW}
+    ${FALL}
     void main() {
-      vPart = aPart; vAlpha = aAlpha; vY = position.y;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(bend(grow(position, aPart)), 1.0);
+      vPart = aPart; vAlpha = aAlpha; vY = position.y; vFall = fallOf(aFall);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(fall(bend(grow(position, aPart)), vFall, aFall), 1.0);
     }`,
   fragmentShader: /* glsl */ `${GLOW_DEFINES}
     uniform vec3 uColor, uStem, uLight;
     uniform float uOutline, uLineOp, uSolid, uGlow, uOpacity, uUnfold;
-    varying float vPart, vAlpha, vY;
+    varying float vPart, vAlpha, vY, vFall;
     ${REVEAL}
     void main() {
-      float shown = reveal(vPart, vY);
+      float shown = reveal(vPart, vY) * (1.0 - smoothstep(0.5, 0.95, vFall));
       if (shown <= 0.0) discard;
       vec3 col = vPart < 0.5 ? uColor : (vPart < 1.5 ? uStem : uLight);
       float a = mix(vAlpha, uLineOp, uOutline);

@@ -113,7 +113,17 @@ html, body, #root { height: 100%; overflow: hidden; }
 .reveal-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .reveal-label { position: absolute; top: 0; left: 0; color: var(--text-primary); white-space: nowrap; text-shadow: var(--glow-text); }
 
+/* Words falling away (D21): a forgotten word sinks out of its gap and fades; then only the dotted gap remains. */
+.lt-recollection .lt-gap { position: relative; }
+.word-leaving { position: absolute; left: 0; bottom: 0; white-space: nowrap; pointer-events: none; opacity: 0;
+  animation: word-leaving 2.8s cubic-bezier(.4, 0, .7, 1) both; }
+@keyframes word-leaving {
+  0% { opacity: 1; transform: none; filter: blur(0); }
+  100% { opacity: 0; transform: translateY(.55em); filter: blur(3px); }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .word-leaving { display: none; }
   .threshold-seed { animation: none; }
   .surface { animation: none; }
   .light-counter .lt-light-dot { transition: none; }
@@ -123,3 +133,31 @@ html, body, #root { height: 100%; overflow: hidden; }
   background: var(--overlay-fill); backdrop-filter: blur(16px); border: 1px solid var(--overlay-border); border-radius: var(--radius-overlay); }
 .time-slider input { width: 240px; display: block; margin-top: var(--space-2); }
 .time-slider-actions { display: flex; gap: var(--space-3); align-items: center; }
+
+.episode-attribution { position: absolute; left: var(--space-4); top: 54px; color: var(--fog); pointer-events: none; }
+.episode-actions { position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); display: flex;
+  align-items: center; justify-content: center; gap: var(--space-4); white-space: nowrap; }
+.episode-actions > span { color: var(--fog); }
+.episode-choices { display: grid; gap: var(--space-4); padding: var(--space-3) 0; }
+.episode-choices .lt-btn { text-align: left; white-space: normal; font-family: var(--font-display); font-size: 24px; line-height: 32px; }
+@media (max-width: 700px) {
+  .episode-actions { gap: var(--space-2); max-width: calc(100vw - 32px); white-space: normal; }
+  .top-left-row { flex-wrap: wrap; max-width: 75vw; }
+}
+
+/* Episode captions and film titles (D26): read from the back of a room. Memory type, text colour, a soft glow;
+   each new line fades up from a slight blur over 1.2s, never fast. */
+.episode-caption { position: absolute; left: 50%; bottom: var(--space-5); transform: translateX(-50%); width: min(980px, calc(100vw - 48px));
+  margin: 0; color: var(--text-primary); text-shadow: var(--glow-text), 0 0 18px rgba(11, 14, 20, 0.9); pointer-events: none; z-index: 3; }
+.episode-caption-line, .film-title-line { display: inline-block; animation: caption-in 1.2s ease both; }
+.film-title { position: absolute; left: 50%; top: 15%; transform: translateX(-50%); width: min(1100px, calc(100vw - 48px)); margin: 0;
+  text-align: center; color: var(--text-primary); text-shadow: var(--glow-text), 0 0 24px rgba(11, 14, 20, 0.9); pointer-events: none; z-index: 3; }
+.film-title-line { animation-duration: 1.8s; }
+/* A breath of night behind the words, so a thread crossing behind them never cuts a letter. No edge, no card. */
+.episode-caption-line, .film-title-line { position: relative; }
+.episode-caption-line::before, .film-title-line::before { content: ''; position: absolute; inset: -0.5em -2em; z-index: -1; pointer-events: none;
+  background: linear-gradient(to right, transparent, rgba(11, 14, 20, 0.66) 9%, rgba(11, 14, 20, 0.66) 91%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 32%, #000 68%, transparent); }
+@keyframes caption-in { from { opacity: 0; filter: blur(6px); } to { opacity: 1; filter: blur(0); } }
+.episode-actions { bottom: 132px; }
+@media (prefers-reduced-motion: reduce) { .episode-caption-line, .film-title-line { animation: none; } }

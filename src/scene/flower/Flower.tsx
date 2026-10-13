@@ -5,6 +5,7 @@ import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { flowerColor, hashSeed, mixOklab, TOKENS, type Kind, type MemoryState } from '../../engine';
+import { warming } from '../../store/sceneReady';
 import { BloomGrowth } from '../fx/BloomGrowth';
 import { DarkSeed } from '../fx/DarkSeed';
 import { ALIVE, dissolveBeats } from '../fx/dissolveTimeline';
@@ -77,12 +78,16 @@ export function Flower({ kind, seed, hue, size, state, position, dim = 1, onPoin
   const lines = useRef<THREE.LineSegments>(null);
   const motes = useRef<THREE.Points>(null);
   const first = useRef(true);
+  /** Clock time this flower began to look like a ghost: its petals start to fall from then (null while alive). */
+  const ghostSince = useRef<number | null>(null);
   const droop = useRef(0);
   /** Glow and halo eased toward the state's targets; the tend swell is added on top each frame. */
   const lit = useRef({ glow: 0, halo: 0 });
   const reduced = useReducedMotion();
   const dpr = useThree((s) => s.viewport.dpr);
   const phase = useMemo(() => (hashSeed(seed) % 1000) / 1000 * Math.PI * 2, [seed]);
+  // Each ghost lets its first petal go after its own 4–12s, so no two fall in step.
+  useEffect(() => { uniforms.uFallFirst.value = 4 + (hashSeed(`fall:${seed}`) % 800) / 100; }, [uniforms, seed]);
 
   const styleOf = (st: MemoryState) => {
     const color = flowerColor(kind, st, hue);
@@ -129,6 +134,13 @@ export function Flower({ kind, seed, hue, size, state, position, dim = 1, onPoin
     const wantOpacity = dim * born.opacity * dying.presence;
     u.uOpacity.value += (wantOpacity - u.uOpacity.value) * (first.current || born.opacity < 1 || lost ? 1 : damp(3, dt));
 
+    // Ghost petals fall one by one while the flower looks like a ghost, and stay fallen if it is lost; tended back
+    // to life, it is whole again. Reduced motion keeps every petal.
+    const ghostly = !reduced && (state === 'ghost' || lost);
+    if (!ghostly) ghostSince.current = null;
+    else if (ghostSince.current === null) ghostSince.current = clock.elapsedTime;
+    u.uFallT.value = ghostSince.current === null ? -1 : clock.elapsedTime - ghostSince.current;
+
     const time = reduced ? 0 : clock.elapsedTime;
     u.uTime.value = time;
     u.uStill.value = reduced ? 1 : 0;
@@ -146,12 +158,13 @@ export function Flower({ kind, seed, hue, size, state, position, dim = 1, onPoin
       const h = geo.head.y / geo.height;
       halo.current.position.x = geo.head.x + u.uBend.value * h * h * geo.height;
     }
-    // A part that would draw nothing is not drawn at all (P12.1: in a big garden every draw call counts).
-    const op = u.uOpacity.value;
-    if (halo.current) halo.current.visible = u.uHalo.value * op > INVISIBLE;
-    if (fill.current) fill.current.visible = Math.max(u.uFill.value, u.uLeafFill.value, u.uSolid.value) * op > INVISIBLE;
-    if (lines.current) lines.current.visible = op > INVISIBLE;
-    if (motes.current) motes.current.visible = u.uMotes.value * op > INVISIBLE;
+    // A part that would draw nothing is not drawn at all (P12.1: in a big garden every draw call counts), except
+    // while the scene warms up: then everything is drawn once, so its shader compiles before it is needed.
+    const op = u.uOpacity.value, warm = warming();
+    if (halo.current) halo.current.visible = warm || u.uHalo.value * op > INVISIBLE;
+    if (fill.current) fill.current.visible = warm || Math.max(u.uFill.value, u.uLeafFill.value, u.uSolid.value) * op > INVISIBLE;
+    if (lines.current) lines.current.visible = warm || op > INVISIBLE;
+    if (motes.current) motes.current.visible = warm || u.uMotes.value * op > INVISIBLE;
   });
 
   const haloW = geo.width * 0.96, haloH = kind === 'place' ? geo.height * 0.4 : haloW;

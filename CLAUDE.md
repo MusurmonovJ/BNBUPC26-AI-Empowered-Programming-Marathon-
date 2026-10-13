@@ -43,13 +43,15 @@ Tagging works with no key: the offline tagger runs in the browser. Optional upgr
 - Never add emoji or exclamation marks. Interface words are lowercase. Dates are human: "planted 3 january 2011". The separator is ` · `.
 - Never add icons. Kinds are coloured seed dots, light is a dot, actions are words.
 - Never add sidebars, cards, tabs, menus, toasts or dashboards. One Overlay at a time, opened by the person.
-- Never use filler memories. Mockups and demos use the ten sample memories in `src/data/sample.ts`, with their exact words.
+- Never use filler memories. Reference demos use the ten sample memories in `src/data/sample.ts`, with their exact words. The authorized contest episode also uses the thirteen authored memories and two planting choices in `src/data/episode.ts`.
 - Never use bouncy or fast motion. A flower grows over 1.6s, a state change eases over ~3s, halos breathe on 7s, fog drifts on 40–90s.
 - Never colour a thread with a flower's colour, and never re-seed a memory (the same id always grows the same flower).
 - Never use the generic Three.js look: no default lights, grey standard materials, grids or spinning orbit.
 - Never send anything but the memory text and known entity names off the device.
 
 ## Working style
+
+The owner authorized the single-season contest episode on 13 October: a paused fictional demo, one remaining light, one pre-season planting, a 21-garden-day transition, and an acceptance ending. This lifts the feature freeze only for this scoped implementation. Personal time, privacy, engine formulas, and the completed performance fixes stay intact. The requested implementation spans the ordered episode tasks; finish the authorized scope, leaving each handoff green.
 
 - One small task per session; commit after each working step.
 - Describe looks with numbers ("bloom 1.1, fog bank opacity 0.06"), not adjectives. Compare screenshots with `docs/look-log/` and the screens PDF.

@@ -2,3 +2,21 @@
 .env
 .env.*
 !.env.example
+
+# Local credentials, private QA, and repository-only materials
+*.pem
+*.key
+.tmp/
+.codex-finalizer/
+.git/
+.vercel/
+docs/
+AGENTS.md
+CLAUDE.md
+README.md
+SUBMISSION.md
+lethe-design-system/*.pdf
+~$*
+*.mp4
+*.mov
+*.webm

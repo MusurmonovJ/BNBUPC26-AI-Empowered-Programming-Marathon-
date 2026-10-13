@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { Line2 } from 'three-stdlib';
 import { rng, TOKENS } from '../../engine';
+import { warming } from '../../store/sceneReady';
 import { damp, useReducedMotion } from '../motion';
 
 export type ThreadArcProps = {
@@ -119,7 +120,8 @@ export function ThreadArc({ a, b, strength, emphasis = 1, flicker = false, sugge
     const out = departing !== undefined && pnow >= departing.releaseAt;
     // State changes ease over ~3s, like dusk; the last thread of a dissolving memory goes out in ~0.8s.
     cur.s += ((held || out ? 0 : strength) - cur.s) * damp(out ? 5 : 1.2, dt);
-    cur.v += ((held || out ? 0 : 1) - cur.v) * damp(out ? 4 : 1.2, dt);
+    // A thread waiting for its flowers to grow is not there at all; it fades in once they have.
+    cur.v = held ? 0 : cur.v + ((out ? 0 : 1) - cur.v) * damp(out ? 4 : 1.2, dt);
     cur.e += (emphasis - cur.e) * damp(6, dt); // hover: ~0.4s, like the interface waking
     const s = cur.s, e = cur.e, v = cur.v;
     const t = reduced ? 0 : clock.elapsedTime;
@@ -170,9 +172,11 @@ export function ThreadArc({ a, b, strength, emphasis = 1, flicker = false, sugge
     // What would draw nothing is not drawn (P12.1): most faint threads carry no light, and a gone thread no line.
     let lit = false;
     for (let i = 0; i < count; i++) if (alpha.getX(i) > 0.002) { lit = true; break; }
-    if (lights.current) lights.current.visible = lit;
-    if (core.current) core.current.visible = (coreMat?.opacity ?? 0) > 0.002;
-    if (glow.current) glow.current.visible = (glowMat?.opacity ?? 0) > 0.002;
+    // ...except while the scene warms up: every part is drawn once, so its shader compiles before it is needed.
+    const warm = warming();
+    if (lights.current) lights.current.visible = warm || lit;
+    if (core.current) core.current.visible = warm || (coreMat?.opacity ?? 0) > 0.002;
+    if (glow.current) glow.current.visible = warm || (glowMat?.opacity ?? 0) > 0.002;
   });
 
   return (

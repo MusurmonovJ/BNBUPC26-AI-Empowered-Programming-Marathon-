@@ -1,116 +1,180 @@
-// "watch a season" (D20): the demo garden plays its own story in about 85 seconds, so a stranger sees the idea
-// rather than hears it. Nothing here is new machinery: each beat calls the store's actions as a person would
-// (hover, tend, plant, two days away, return, the reveal), and the garden says one line beneath it. The lines
-// carry the first pillar: forgetting is dusk, and it is how a garden keeps what matters.
-// Any click or key stops it and leaves a live garden behind.
-
+// A three-minute film of real episode actions, in seven acts (D26): what Lethe is, how a life holds together, a
+// planting, a choice, a season, the same life with a different choice, and what remains. Every outcome is the
+// engine's own; nothing is forced lost and nothing is brought back.
+import { CLOSING_LINES, EPISODE_CHOICES, EPISODE_INTRO } from '../data/episode';
+import { holders } from '../engine';
 import { useGarden } from '../store/garden';
+import { presentationClock } from '../store/presentationClock';
+import { sceneReady } from '../store/sceneReady';
 
-/** The story's lines, in the garden's voice: sentence case, no exclamations, nothing counted. */
+/** Captions, in the interface voice: lowercase, read at the bottom of the screen. */
 export const STORY_LINES = {
-  flowers: 'Every flower is a memory: something said, a song, a place, a photograph.',
-  rule: 'Memories that share someone or somewhere hold each other up.',
-  tend: 'Light is scarce. To tend one memory is to choose it.',
-  plant: 'A new memory finds what it shares.',
-  joins: 'It grows into what holds it.',
-  away: 'Now the garden is left alone for two days.',
-  shape: 'A garden that kept everything would have no shape. Forgetting is how it keeps what matters.',
-  returned: 'Nothing is gone for good. What is let go can be returned to.',
-  holds: 'What remains shows what holds a life together.',
+  flowers: 'every flower is a fragment of a life: words, songs, places, photographs.',
+  rule: 'memories that share someone or somewhere hold each other up.',
+  leo: 'a night bus with leo, held by every other memory of him.',
+  rooftop: 'the library rooftop. a place remembered on its own.',
+  alone: 'what nothing else shares has nothing to lean on.',
+  plant: 'a new memory finds what it shares.',
+  joins: 'it grows into what holds it.',
+  tend: 'one light remains. to tend one memory is to choose it.',
+  reach: 'its light reaches everything her words are part of.',
+  rest: 'the rest is left to the season.',
+  away: 'three weeks pass in this garden.',
+  held: 'what was held together still glows.',
+  shared: 'this time, the rooftop is remembered with leo.',
+  thread: 'a thread reaches the rooftop.',
+  again: 'the light still goes to grandma mei.',
+  away2: 'three weeks pass again.',
+  faint: 'the rooftop is still here, faint.',
+  why: 'no light reached it. a thread did.',
+  shape: CLOSING_LINES[0],
+  holds: CLOSING_LINES[1],
 } as const;
 
-/** The memory the story writes: it names Grandma Mei and Hangzhou, so it joins her memories. */
-const PLANTED = 'Tea with Grandma Mei in Hangzhou.';
-const TYPE_MS = 55;
-/** How long the last line stays before the garden speaks for itself again. */
-const LAST_LINE_MS = 9000;
+/** Title cards, in the sky above the garden at the film's turning points. */
+export const FILM_TITLES = {
+  kept: 'Everything we make today is made to be kept.',
+  vault: 'But memory was never a vault.',
+  garden: 'It is a garden.',
+  erased: 'Nothing is erased. It only steps out of the light.',
+  again: 'The same life. A different choice.',
+  name: 'Lethe — a garden that forgets.',
+} as const;
+
+/** The film's length in seconds, from the first title card. */
+export const FILM_SECONDS = 180;
 
 let run: AbortController | null = null;
-
-const wait = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, reject) => {
-  if (signal.aborted) { reject(signal.reason); return; }
-  const t = setTimeout(resolve, ms);
-  signal.addEventListener('abort', () => { clearTimeout(t); reject(signal.reason); }, { once: true });
-});
-
 export const storyRunning = () => run !== null;
 
-/** Begin the story on the demo garden, from its first day. */
-export function startStory() {
+export function waitForPresentation(ms: number, signal: AbortSignal): Promise<void> {
+  const until = presentationClock.now() + ms;
+  return new Promise((resolve, reject) => {
+    let timer: ReturnType<typeof setTimeout>;
+    const clean = () => { clearTimeout(timer); signal.removeEventListener('abort', abort); };
+    const abort = () => { clean(); reject(signal.reason); };
+    const poll = () => {
+      if (signal.aborted) { abort(); return; }
+      if (presentationClock.now() >= until) { clean(); resolve(); return; }
+      timer = setTimeout(poll, 50);
+    };
+    signal.addEventListener('abort', abort, { once: true });
+    poll();
+  });
+}
+
+/**
+ * Entry is always a user gesture. From the threshold the episode is already prepared (it grows in as the threshold
+ * fades), so it is only opened; anywhere else the film begins a fresh episode.
+ */
+export function startStory({ prepared = false }: { prepared?: boolean } = {}) {
   stopStory();
   const ctrl = (run = new AbortController());
   const s = useGarden.getState;
-  const line = (l: string | null) => s().setStory({ line: l });
-  s().seeDemo();
-  s().setStory({ running: true, line: null });
-  // A click anywhere (except the story's own word, which stops it itself) or any key hands the garden back.
-  const interrupt = (e: Event) => { if (!(e.target instanceof Element && e.target.closest('.story-entry'))) stopStory(); };
+  if (prepared && s().episode?.mode === 'film') s().openEpisode(); else s().beginEpisode('film');
+  let generation = s().generation;
+  s().setStory({ running: true, line: EPISODE_INTRO, title: null });
+  const signal = ctrl.signal;
+  const line = (text: string | null) => s().setStory({ line: text });
+  const title = (text: string | null) => s().setStory({ title: text });
+  const interrupt = (event: Event) => {
+    if (event.type === 'pointerdown' && event.target instanceof Element && event.target.closest('.story-entry')) return;
+    stopStory();
+  };
   addEventListener('pointerdown', interrupt, true);
   addEventListener('keydown', interrupt, true);
-  ctrl.signal.addEventListener('abort', () => {
+  addEventListener('wheel', interrupt, { capture: true, passive: true });
+  // A new session (a restart, a reset, the person leaving) ends the film; only its own second season does not.
+  let rewinding = false;
+  const unsubscribe = useGarden.subscribe((state) => {
+    if (!rewinding && (state.generation !== generation || !state.story.running)) ctrl.abort();
+  });
+  /** The same life again: the garden regrows from its seeds and the film plays on into a second season. */
+  const rewind = () => {
+    const story = s().story;
+    rewinding = true;
+    try { s().beginEpisode('film'); s().setStory(story); } finally { rewinding = false; }
+    generation = s().generation;
+  };
+  signal.addEventListener('abort', () => {
     removeEventListener('pointerdown', interrupt, true);
     removeEventListener('keydown', interrupt, true);
+    removeEventListener('wheel', interrupt, true);
+    unsubscribe();
+    if (run === ctrl) run = null;
   }, { once: true });
 
-  const play = async (signal: AbortSignal) => {
-    const w = (ms: number) => wait(ms, signal);
-    // The first line at once, so the garden opens on the story rather than on its usual whisper.
-    line(STORY_LINES.flowers); await w(6500);
-
-    // Connection: a memory and what holds it.
-    s().hover('m1'); line(STORY_LINES.rule); await w(6500);
-    s().hover(null);
-
-    // Choice: tending spends scarce light, and the light runs to its neighbours.
-    s().focus('m1'); await w(1800);
-    s().tendMemory('m1'); line(STORY_LINES.tend); await w(5500);
-    s().focus(null); await w(1200);
-
-    // A new memory finds its threads while it is written, then grows into them.
-    s().openPlanting('field', 'sentence'); line(STORY_LINES.plant); await w(900);
-    for (let i = 1; i <= PLANTED.length; i++) { s().setDraftText(PLANTED.slice(0, i)); await w(TYPE_MS); }
-    await w(2600);
-    await s().plantDraft(); line(STORY_LINES.joins); await w(5000);
-
-    // Forgetting: two days away, played back as dusk; the garden says for itself what happened. The camera goes
-    // straight to the library rooftop, which nothing holds, so its dissolve is seen up close.
-    line(STORY_LINES.away); await w(3800);
-    line(null); s().setDebugOffset(14); s().arrive(); await w(300);
-    s().focus('m10'); await w(7200);
-
-    // Then the whole garden at dusk: what was held still glows. That is the point of forgetting.
-    s().focus(null); line(STORY_LINES.shape); await w(8500);
-
-    // And the seed: nothing is gone for good.
-    s().focus('m10'); await w(1800);
-    s().returnToMemory('m10'); line(STORY_LINES.returned); await w(5500);
-    s().focus(null); await w(900);
-
-    // What holds you.
-    s().openReveal(); line(STORY_LINES.holds); await w(LAST_LINE_MS);
+  const play = async () => {
+    await Promise.race([sceneReady, waitForPresentation(4000, signal)]);
+    if (signal.aborted) return;
+    const started = presentationClock.now();
+    const at = (seconds: number) => waitForPresentation(Math.max(0, started + seconds * 1000 - presentationClock.now()), signal);
+    // Prologue: the seeds fall while three cards say what Lethe is.
+    line(null); title(FILM_TITLES.kept);
+    await at(4.5); title(FILM_TITLES.vault);
+    await at(9); title(FILM_TITLES.garden);
+    // Fragments: a life, and the rule that holds it together.
+    await at(14); title(null); line(STORY_LINES.flowers);
+    await at(20); s().focus('m1'); line(STORY_LINES.rule);
+    await at(27); s().focus('m4'); line(STORY_LINES.leo);
+    await at(33); s().focus('m10'); line(STORY_LINES.rooftop);
+    await at(39); s().focus(null); line(STORY_LINES.alone);
+    // Growing: one fragment is planted and joins her.
+    await at(44); s().selectEpisodeChoice('tea'); line(STORY_LINES.plant);
+    await at(51); await s().plantDraft(); line(STORY_LINES.joins);
+    // Choosing: the last light.
+    await at(58); s().focus('m1'); line(STORY_LINES.tend);
+    await at(61); s().tendMemory('m1');
+    await at(66); line(STORY_LINES.reach);
+    await at(71); s().focus(null); line(STORY_LINES.rest);
+    // A season: the rooftop dissolves up close, then the changed garden.
+    await at(76); line(STORY_LINES.away);
+    await at(79); s().focus('m10'); s().advanceEpisode(); line(null);
+    await at(86); s().setPresentation({ headId: null, quiet: true });
+    await at(91); s().focus(null); s().finishEpisode(); s().setPresentation({ quiet: false });
+    await at(92); title(FILM_TITLES.erased);
+    await at(99); title(null); s().setPresentation({ holderId: strongestHolder() }); line(STORY_LINES.held);
+    await at(105); line(null);
+    // Another choice: the same life regrows, and the rooftop is planted with Leo instead of the tea.
+    await at(107); rewind(); title(FILM_TITLES.again);
+    await at(114); title(null); s().selectEpisodeChoice('rooftop'); line(STORY_LINES.shared);
+    await at(121); await s().plantDraft(); line(STORY_LINES.thread);
+    await at(123.5); s().focus(EPISODE_CHOICES.rooftop.id);
+    await at(127); s().focus('m1'); line(STORY_LINES.again);
+    await at(130); s().tendMemory('m1');
+    await at(134); s().focus(null); line(STORY_LINES.away2);
+    await at(137); s().focus('m10'); s().advanceEpisode(); line(null);
+    await at(145); line(STORY_LINES.faint);
+    await at(151); line(STORY_LINES.why);
+    await at(157); s().focus(null); s().finishEpisode(); line(null);
+    // Coda: what remains, and the name.
+    await at(159); s().setPresentation({ holderId: strongestHolder() }); line(STORY_LINES.shape);
+    await at(165); line(STORY_LINES.holds);
+    await at(171); title(FILM_TITLES.name);
+    await at(FILM_SECONDS);
+    if (s().generation !== generation || signal.aborted) return;
+    s().setStory({ running: false, line: null, title: null });
+    s().setPresentation({ line: CLOSING_LINES[1], quiet: false });
+    s().finishEpisode();
+    ctrl.abort();
   };
-
-  void play(ctrl.signal)
-    .then(() => finish(ctrl))
-    .catch(() => { /* stopped */ });
+  void play().catch(() => { /* cancellation hands back the live episode */ });
 }
 
-/** The story has played to its end: hand the garden back quietly, leaving the reveal open. */
-function finish(ctrl: AbortController) {
-  if (run !== ctrl) return;
-  run = null;
-  ctrl.abort();
-  useGarden.getState().setStory({ running: false, line: null });
+/** The person or place that holds the most of what remains: the group the closing composition lights. */
+function strongestHolder(): string | null {
+  const s = useGarden.getState();
+  return holders(s.garden, s.now())[0]?.entityId ?? null;
 }
 
-/** Stop wherever it is: whatever the story left open (the planting field, a hover) is put down. */
 export function stopStory() {
-  if (!run) return;
   const ctrl = run;
+  if (!ctrl) return;
   run = null;
   ctrl.abort();
   const s = useGarden.getState();
-  if (s.planting !== 'closed') s.closePlanting();
+  s.stopPresentation();
+  s.closePlanting();
   s.hover(null);
-  s.setStory({ running: false, line: null });
+  s.focus(null);
 }

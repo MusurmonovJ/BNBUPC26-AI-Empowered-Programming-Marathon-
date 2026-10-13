@@ -27,7 +27,7 @@ export function layoutOf(ids: string[], positions: Record<string, Place>): Recor
   const out: Record<string, Place> = {};
   const taken: Place[] = [];
   for (const id of ids) {
-    const p = SAMPLE_LAYOUT[id] ?? positions[id];
+    const p = positions[id] ?? SAMPLE_LAYOUT[id];
     if (p) { out[id] = p; taken.push(p); }
   }
   // A memory with no stored spot (shouldn't happen once planted through the store) still gets a stable one.

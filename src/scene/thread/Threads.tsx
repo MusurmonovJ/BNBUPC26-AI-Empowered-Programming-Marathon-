@@ -7,7 +7,7 @@
 
 import { useMemo, useRef } from 'react';
 import { threadBrightness, threadKey, type MemoryView } from '../../engine';
-import { useGarden, useRevealHeld } from '../../store/garden';
+import { useGarden, useRevealHeld, useTendReach } from '../../store/garden';
 import { flowerHead } from '../flower/Flower';
 import { baseToWorld } from '../layout';
 import { useLayout } from '../useLayout';
@@ -17,7 +17,12 @@ import { HOVER_DIM, HOVER_LIT, REVEAL_DIM, REVEAL_LIT, RIPPLE_TRAVEL_MS, ThreadA
 import type * as THREE from 'three';
 
 /** Up to this many threads, every one is drawn (the demo garden has eight). */
+const DRAW_ALL_UP_TO = 24;
+/** Past that, at most this many are drawn at rest, and never more than 1.25 per flower (D19). */
 const THREAD_BUDGET = 60;
+const PER_FLOWER_SHARE = 1.25;
+/** The episode's closing composition: threads outside the lit holder stay faintly visible. */
+const PRESENT_THREAD_DIM = 0.4;
 /** Past the budget, each flower keeps at least its strongest few. */
 const THREADS_PER_FLOWER = 2;
 
@@ -34,9 +39,13 @@ export function Threads() {
   const events = useGarden((s) => s.events);
   const layout = useLayout();
   const held = useRevealHeld();
+  const revealOpen = useGarden((s) => s.reveal.open);
+  // In the episode, an open memory with light to spend lights the threads its tending would travel along.
+  const reach = useTendReach();
   const emphasisFor = (ids: string[]) =>
-    held ? (ids.every((id) => held.includes(id)) ? REVEAL_LIT : REVEAL_DIM)
-    : focusedId ? HOVER_DIM : !hoveredId ? 1 : ids.includes(hoveredId) ? HOVER_LIT : HOVER_DIM;
+    held ? (ids.every((id) => held.includes(id)) ? REVEAL_LIT : revealOpen ? REVEAL_DIM : PRESENT_THREAD_DIM)
+    : focusedId ? (reach && ids.includes(focusedId) ? HOVER_LIT : HOVER_DIM)
+    : !hoveredId ? 1 : ids.includes(hoveredId) ? HOVER_LIT : HOVER_DIM;
 
   const live = useMemo(() => garden.threads.flatMap((t): Drawn[] => {
     const A = garden.memories[t.a], B = garden.memories[t.b];
@@ -56,20 +65,21 @@ export function Threads() {
 
   // The threads a big garden draws: each flower's strongest few, then the strongest of the rest, up to the budget.
   const strongest = useMemo(() => {
-    if (live.length <= THREAD_BUDGET) return live;
+    if (live.length <= DRAW_ALL_UP_TO) return live;
+    const cap = Math.min(THREAD_BUDGET, Math.round(Object.keys(garden.memories).length * PER_FLOWER_SHARE));
     const byStrength = [...live].sort((x, y) => y.strength - x.strength);
     const count = new Map<string, number>();
     const keep = new Set<Drawn>();
     for (const t of byStrength) {
-      if (keep.size >= THREAD_BUDGET) break;
+      if (keep.size >= cap) break;
       if (t.ids.some((id) => (count.get(id) ?? 0) < THREADS_PER_FLOWER)) {
         keep.add(t);
         for (const id of t.ids) count.set(id, (count.get(id) ?? 0) + 1);
       }
     }
-    for (const t of byStrength) { if (keep.size >= THREAD_BUDGET) break; keep.add(t); }
+    for (const t of byStrength) { if (keep.size >= cap) break; keep.add(t); }
     return live.filter((t) => keep.has(t));
-  }, [live]);
+  }, [live, garden]);
   // What the person is looking at always shows all its threads: the hovered or open flower, or the reveal's holder.
   const drawn = useMemo(() => {
     if (strongest === live) return live;

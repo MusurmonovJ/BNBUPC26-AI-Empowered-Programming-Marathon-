@@ -14,7 +14,7 @@ import { offlineTag } from './offline';
 export type TagSource = 'claude' | 'groq' | 'offline';
 export type TagResult = { people: Tags; places: Tags; feelings: Tags; source: TagSource };
 
-export const API_TIMEOUT_MS = 2500;
+export const API_TIMEOUT_MS = 4000;
 export const COOLDOWN_MS = 3 * 60_000;
 
 const policy = { off: false, cooldownUntil: 0 };

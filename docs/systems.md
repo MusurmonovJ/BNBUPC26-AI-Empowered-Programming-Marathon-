@@ -95,18 +95,26 @@ Song memories skip their "title, artist." part, so the composer is never a perso
 | 429 | provider rate limit | keep offline tags; don't ask again for 3 minutes, or the `retry-after`, whichever is longer |
 | 502 | provider error, or a reply in the wrong shape | keep offline tags; ask again next time |
 | 503 | no key configured | keep offline tags; don't ask again this session |
-| 504, or no reply in 2.5s | slow | keep offline tags; ask again next time |
+| 504, or no reply in 4s | slow | keep offline tags; ask again next time |
 
 ## Sound (Tone.js), mapped to events
 
 | event | sound |
 |---|---|
-| first click on threshold | start audio context; drone fades in over 4s |
-| fog share (fading+ghost / all) | drone filter cutoff falls and a second detuned voice rises in volume |
-| hover flower | that flower's note: pentatonic (C D E G A), octave by kind (place low, sentence mid, song high, photo mid), note index = hash(id) % 5 |
+| first click on threshold | start audio context; drone fades in over 4s; the music (D27) fades in over 8s from 2.5s |
+| always, once started | **the music** (`src/sound/score.ts`): a waltz in C at 63 bpm, 3/4, one chord every 2 bars. Pad (fat triangle, attack 1.8s), a soft bass on each downbeat, and a melody (soft FM keys) that steps along the chord's notes, only ever C D E G A |
+| fog share (fading+ghost / all) | drone filter cutoff falls and a second detuned voice rises in volume; the music's lowpass closes (2400 → 900 Hz), its melody thins (60% → 12% of beats), and from 0.35 the next round of chords turns from IV–I–vi–V (Fmaj7 Cmaj7 Am7 G6) to vi–IV–ii–iii (Am7 Fmaj7 Dm7 Em7) |
+| hover flower | that flower's note as a small glass tone (FM, 0.9s), an octave above it faint: pentatonic (C D E G A), octave by kind (place low, sentence mid, song high, photo mid), note index = hash(id) % 5 |
+| open a memory / back to the garden | its note and the fifth above, breathed in (attack 0.35s) / its note an octave down, quietly |
+| plant opens | a breath of C and G |
 | tend | soft chime on the flower's note, then each neighbour's note 120ms apart along threads |
 | new thread | the two notes resolve into a chord (play together, 1.5s release) |
 | lost | the note bends down a minor third over 2s and fades |
+| a season passes (replay starts) | the fog's wind: pink noise through a band sinking 1100 → 260 Hz, swelling 2.5s, holding 3.5s, settling 5s; the music steps back to 35% and its melody waits until the replay ends |
+| what holds you (reveal, or the film's held composition) | the holder's memories' notes, low to high, 0.16s apart |
+| a title card in the film | a low breath of C3 G3 E4 |
+| light gained | two glass notes, E6 then A6 |
+| the film holds still (`presentation.quiet`) | drone to 45%, music to 35% |
 | mute | visible `sound on/off` bottom-right; remembered |
 
 ## Tuning targets

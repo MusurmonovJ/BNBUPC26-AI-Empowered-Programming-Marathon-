@@ -1,5 +1,5 @@
 import { FEELING_ONLY_WEIGHT, THREAD_FULL_AT, THREAD_WEIGHT } from './constants';
-import { relationKey, relationOf } from './relations';
+import { placeKey, placeOf, relationKey, relationOf } from './relations';
 import type { Entity, EntityKind, Garden, Memory, Thread } from './types';
 
 export const threadKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
@@ -88,8 +88,12 @@ const norm = (s: string) =>
   s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '')
     .replace(/^(my|our|the)\s+/, '').replace(/[’']s$/, '').replace(/[^\p{L}\p{N} ]/gu, '').trim();
 
-/** Matching key: people named by relation share one key, so "Mom", "mum" and "my mother" are one person. */
-const keyOf = (kind: EntityKind, name: string) => (kind === 'person' ? relationKey(norm(name)) : norm(name));
+/**
+ * Matching key: people named by relation share one key, so "Mom", "mum" and "my mother" are one person; everyday
+ * places with more than one name share one too, so "home", "our homeplace" and "my house" are one place.
+ */
+const keyOf = (kind: EntityKind, name: string) =>
+  kind === 'person' ? relationKey(norm(name)) : kind === 'place' ? placeKey(norm(name), name) : norm(name);
 
 export function findEntity(g: Garden, kind: EntityKind, name: string): Entity | undefined {
   const k = keyOf(kind, name);
@@ -114,7 +118,8 @@ export function resolveEntity(g: Garden, kind: EntityKind, name: string, existin
   for (let i = 2; g.entities[unique]; i++) unique = `${id}-${i}`;
   // People named by relation are shown the same way whoever tagged them ("my mother" → "Mom").
   const relation = kind === 'person' ? relationOf(norm(name)) : undefined;
-  g.entities[unique] = { id: unique, kind, name: relation?.display ?? name.trim(), aliases: [] };
+  const place = kind === 'place' ? placeOf(norm(name), name) : undefined;
+  g.entities[unique] = { id: unique, kind, name: relation?.display ?? place?.display ?? name.trim(), aliases: [] };
   return unique;
 }
 

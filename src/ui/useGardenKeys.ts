@@ -16,8 +16,9 @@ export function useGardenKeys() {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const active = document.activeElement;
       if ((e.key === 'n' || e.key === 'N') && !typing(active)) {
-        const { planting, openPlanting, phase, settings } = useGarden.getState();
-        if (phase === 'garden' && planting === 'closed' && !settings) { e.preventDefault(); openPlanting('field'); }
+        const { planting, openPlanting, phase, settings, episode } = useGarden.getState();
+        // In the episode, N offers the two fragments first (and "write a memory" from there).
+        if (phase === 'garden' && planting === 'closed' && !settings) { e.preventDefault(); openPlanting(episode ? 'kind' : 'field'); }
         return;
       }
       if (e.key === 'Escape') {

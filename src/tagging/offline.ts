@@ -19,7 +19,11 @@ function loadNlp(): Promise<Nlp> {
 export const preloadOfflineTagger = () => { void loadNlp(); };
 
 /** Everyday places worth threading even in lowercase ("the library rooftop at university"). */
-const GENERIC_PLACES = ['home', 'school', 'university', 'college', 'hospital', 'church', 'temple', 'mosque', 'office', 'work'];
+const GENERIC_PLACES = ['home', 'homeplace', 'home place', 'family home', 'childhood home', 'homestead',
+  'school', 'university', 'college', 'hospital', 'church', 'temple', 'mosque', 'office', 'work'];
+/** Home named by what it is ("our house"), or reached rather than stood in ("went home", "back home"). */
+const OWN_HOME = /\b(?:my|our)\s+(?:house|flat|apartment)\b/i;
+const TO_HOME = /\b(?:went|go|goes|going|gone|came|come|comes|coming|back|walked|walking|drove|driving|flew|got|get|getting|headed|heading|ran|running|way)\s+home\b/i;
 /** Words that look like names at the start of a sentence but aren't. */
 const NOT_NAMES = new Set(['i', 'we', 'you', 'she', 'he', 'they', 'it', 'my', 'our', 'the', 'a', 'an', 'this', 'that', 'there', 'then', 'when', 'after', 'before']);
 
@@ -106,6 +110,8 @@ export async function offlineTag(g: Garden, kind: Kind, text: string): Promise<O
   for (const p of GENERIC_PLACES) {
     if (new RegExp(`\\b(?:at|in|from|to|around)\\s+(?:the\\s+|my\\s+|our\\s+)?${p}\\b`, 'i').test(body)) places.add(p);
   }
+  // Every name for home becomes "home" in the engine's matching (relations.ts PLACE_NAMES), so they thread together.
+  if (OWN_HOME.test(body) || TO_HOME.test(body)) places.add('home');
   const isPlace = (name: string) => [...places].some((p) => p.toLowerCase() === name.toLowerCase() ||
     new RegExp(`(^|\\s)${escapeRe(name)}(\\s|$)`, 'i').test(p));
 

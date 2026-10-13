@@ -12,8 +12,8 @@ How each design-system rule becomes a Three.js parameter. The look reference is 
 | camera | perspective, fov 40, default position (0, 3.4, 11.5), looking at (0, 1.1, 0) |
 | drift | x ± 0.8 over 40s, y ± 0.15 over 55s, around wherever the person left the camera. It starts after 5s without a touch and fades in over 2s. Never fast. |
 | focus | look at head + (1.0, 0, 0) from there + (0, 0.35, 4.4), gliding with damping k = 1.2/s. The flower stands at about a third of the width, its words on the right half (left 54%). Other flowers recede to opacity 0.3 over ~1s and every thread dims to ×0.35 (screen p2). |
-| overview | scrolling out lowers the polar ceiling from 83° (at distance 11.5) to 55° (at 16), so the camera rises over the garden as it pulls back. The reveal (P9) can glide to that pose. |
-| limits | orbit azimuth ±25°, polar 55–83°, distance 4–16 (drei `OrbitControls`, damping on, pan off) |
+| overview | scrolling out lowers the polar ceiling from 83° (at distance 11.5) to 50° (at 24), so the camera rises over the garden as it pulls back. The reveal (P9) can glide to that pose. |
+| limits | orbit azimuth ±70°, polar 30–83° (45° in the reveal), distance 3–24 (drei `OrbitControls`, damping on, pan on, zoom toward cursor). The look-at point stays clamped over the garden (x −9…9, z −7…6.5). <kbd>WASD</kbd>/arrows glide, <kbd>Q</kbd>/<kbd>E</kbd> turn (D23). |
 | background | `night` #0b0e14; ground #0d1119 with a soft radial lighten under clusters |
 | scene fog | `FogExp2(night, 0.045)` for depth; volumetric look comes from the fog banks below |
 
@@ -52,7 +52,7 @@ How each design-system rule becomes a Three.js parameter. The look reference is 
 
 Use `flowerColor(kind, state, hue)` from `src/engine/color.ts`. It is tested to match the `*-fading` tokens exactly.
 
-**Ghost text loss** is in the DOM (Recollection). **Ghost petals fall one by one:** each ghost flower drops one petal every ~20s until 40% have fallen (seeded, so the same petals fall each visit).
+**Ghost text loss** is in the DOM (Recollection). **Ghost petals fall one by one:** each ghost flower drops one petal every ~20s until 40% have fallen (seeded, so the same petals fall each visit). *As built (13 Oct):* each petal shape carries `aFall`, its seeded turn (only the first 40% of petals by turn ever fall; −1 for everything else), in the existing fill and line meshes. While a flower looks like a ghost (and on into lost), `uFallT` counts seconds; petal *k* starts to fall at `uFallFirst` (4–12s, seeded per flower) + 20s·*k*, sinks `head height` over 7s with a slight sway, and has faded by 95% of the way. Tended back to life, it is whole again. Reduced motion: no petals fall. No extra draw calls.
 
 ## Threads
 
@@ -115,6 +115,8 @@ All of it is skipped with `prefers-reduced-motion`, except the state change itse
 | 3.6 | the last thread goes out (opacity → 0 over 0.8s) |
 | 4.5 | an empty spot with a small dark seed (dark ellipse + faint ring) that can be returned to |
 
+**The garden grows in.** Entering the demo garden ("see a garden", "watch a season", reset demo garden, or a `?demo` link), every memory blooms through the beats above, left to right, 160ms apart, starting 450ms after the threshold has faded (1.8s after load on a `?demo` link). Each seed waits glowing in the dark until its turn, so the threshold's single seed becomes ten. Threads stay hidden until both their flowers have grown, then light with the first-thread pulse. Sound: each flower's own note as its seed lands (−28 dB), never a chord. *As built:* `growIn` in `src/store/garden.ts` (quiet `bloom` events), `prepareDemo`/`openDemo` so the threshold never reveals a grown garden that then regrows.
+
 **The first thread.** When a plant creates its first thread: a light pulse runs from the new flower to the neighbour (0.9s), the thread then fades in, and the chord plays.
 
 **The reveal.** Rise to the overview. Every flower not held by the chosen person or place dims to 15%, and its threads to 5%. The held threads brighten × 1.6, and labels show beside each held flower (DOM, `interface-sm`).
@@ -135,6 +137,14 @@ All of it is skipped with `prefers-reduced-motion`, except the state change itse
 | Noise (film grain) | opacity 0.025 | off |
 
 DPR is clamped to [1, 1.75]. Quality drops automatically if drei `PerformanceMonitor` reports a decline.
+
+## Contest film presentation
+
+Decisions D25 and D26 extend the reference rendering for the fictional episode. The three-minute film makes two visits to the same life, with all state changes coming from the engine. Episode captions use `memory-lg` (32px) during the film and `memory` (24px) in play, in `text-primary`. Title cards use the existing `title` style (40px) in the sky at 15% of viewport height. Captions fade in over 1.2s and titles over 1.8s; reduced motion removes these animations. A soft, edgeless band of night behind the words preserves their contrast against threads.
+
+Living flowers release pollen through one additive point cloud: vivid 7 motes at alpha 0.55, fading 3 at 0.3, ghost and lost none. Motes rise 1.1 world units over 7–11s and dim to 35% while a memory is open or a relationship holder is emphasized. Reduced motion removes the drifting pollen. Cluster ground pools use vitality-weighted living flower colors, mixed halfway toward fog, at 0.06 × lift + 0.035 × ring. Threads keep their original warm ivory color.
+
+The ending keeps the rest of the changed garden at 45% flower opacity and 40% thread strength while emphasizing an actual surviving holder. The standard interactive reveal retains its existing dimming. Color, ghost outlines and dark seeds remain part of the composition.
 
 ## Reduced motion
 

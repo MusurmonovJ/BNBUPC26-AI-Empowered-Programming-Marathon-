@@ -18,20 +18,42 @@ export function GardenWhisper() {
   const override = useGarden((s) => s.whisperOverride);
   const phase = useGarden((s) => s.phase);
   const story = useGarden((s) => s.story);
+  const presentation = useGarden((s) => s.presentation);
+  const episode = useGarden((s) => s.episode);
   // While the story plays, its line comes first and nothing hides it: the story decides when it changes.
-  const line = story.line ?? override ?? ((summary && returnWhisper(garden, views, summary)) || idleWhisper(garden, views));
+  const line = story.running ? story.line : presentation.line ?? override ?? (episode ? episode.stage === 'exploring'
+    ? garden.light ? 'one light remains. tending a memory also reaches what is connected.' : 'your light has found its place. let a season pass when you are ready.'
+    : episode.continued ? 'a little light for what you return to.' : null
+    : ((summary && returnWhisper(garden, views, summary)) || idleWhisper(garden, views)));
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
     setVisible(true);
-    if (story.running) return;
+    if (story.running || presentation.line) return;
     const hide = () => setVisible(false);
     const t = setTimeout(hide, SHOW_MS);
     const onMove = () => hide();
     const arm = setTimeout(() => addEventListener('pointermove', onMove, { once: true }), ARM_MS);
     return () => { clearTimeout(t); clearTimeout(arm); removeEventListener('pointermove', onMove); };
-  }, [line, story.running]);
+  }, [line, story.running, presentation.line]);
 
   if (!line || phase !== 'garden') return null;
+  // The episode is shown to a room (D26): its lines are captions in the memory type, large enough to read from the
+  // back of a hall, each fading in over the last. The film's are larger still.
+  if (episode) {
+    return (
+      <p className={`lt-whisper ${story.running ? 'memory-lg' : 'memory'} episode-caption${visible ? '' : ' is-gone'}`} role="status">
+        <span key={line} className="episode-caption-line">{line}</span>
+      </p>
+    );
+  }
   return <Whisper className="edge bottom-center whisper" visible={visible}>{line}</Whisper>;
+}
+
+/** The film's turning points: a title card in the empty sky above the garden (D26). */
+export function FilmTitle() {
+  const title = useGarden((s) => (s.story.running ? s.story.title ?? null : null));
+  const phase = useGarden((s) => s.phase);
+  if (!title || phase !== 'garden') return null;
+  return <p className="title film-title" aria-live="polite"><span key={title} className="film-title-line">{title}</span></p>;
 }

@@ -3,7 +3,8 @@
 // Bloom and Thread are NOT here: in Lethe they are 3D (src/scene).
 
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { rng, stateOf, type Kind, type MemoryState } from '../engine';
+import { stateOf, type Kind, type MemoryState } from '../engine';
+import { forgottenWords, splitWord } from './forgetWords';
 
 const cx = (...xs: (string | false | null | undefined)[]) => xs.filter(Boolean).join(' ');
 
@@ -34,19 +35,29 @@ export function LightCounter({ value, max = 5, showLabel, className, style }:
 }
 
 /* ---------- Recollection ---------- */
-function memoryText(text: string, state: MemoryState, seed: string): ReactNode[] {
-  const r = rng(`words:${seed || text}`);
-  const drop = state === 'ghost' ? 0.4 : state === 'lost' ? 0.85 : 0;
+/**
+ * The memory's words, with what it has forgotten left as gaps. Which words go is Lethe's (D22, `forgetWords.ts`):
+ * the specifics first, where the design system dropped words at random; the gap markup is the design system's.
+ */
+function memoryText(text: string, state: MemoryState, seed: string, keywords: string[] = []): ReactNode[] {
+  const forgotten = forgottenWords(text, state, seed, keywords);
   const parts = String(text).split(/(“[^”]*”|"[^"]*")/);
-  let n = 0;
+  let n = 0, gone = 0;
   return parts.map((part, pi) => {
     if (!part) return null;
     const speech = /^[“"]/.test(part);
     const words = part.split(/(\s+)/).map((wd, wi) => {
       if (!wd || /^\s+$/.test(wd)) return wd;
-      const first = n++ === 0;
-      if (drop && !first && r() < drop) return <span key={wi} className="lt-gap" style={{ width: `${Math.max(2, wd.length * 0.45)}em` }} />;
-      return wd;
+      if (!forgotten.has(n++)) return wd;
+      // A forgotten word leaves through its gap: it blurs, sinks and fades, one after another (D21). Its quote
+      // marks and punctuation stay, so the sentence keeps its shape. The inner span is Lethe's only addition to
+      // the design system's markup; the gap itself is unchanged.
+      const [lead, core, trail] = splitWord(wd);
+      return (
+        <span key={wi}>{lead}<span className="lt-gap" style={{ width: `${Math.max(2, core.length * 0.45)}em` }}>
+          <span className="word-leaving" aria-hidden style={{ animationDelay: `${600 + 180 * gone++}ms` }}>{core}</span>
+        </span>{trail}</span>
+      );
     });
     return speech ? <em key={pi} className="lt-speech">{words}</em> : <span key={pi}>{words}</span>;
   });
@@ -55,6 +66,8 @@ function memoryText(text: string, state: MemoryState, seed: string): ReactNode[]
 export function Recollection(props: {
   text: string; seed: string; kind?: Kind; planted?: string; vitality?: number; state?: MemoryState;
   heldBy?: string[]; actions?: ReactNode; size?: 'lg'; children?: ReactNode; className?: string; style?: React.CSSProperties;
+  /** The memory's own people and places: the first words it forgets (D22). */
+  keywords?: string[];
 }) {
   const state = props.state ?? stateOf(props.vitality ?? 1);
   const bits = [props.kind, props.planted ? `planted ${props.planted}` : null, state].filter(Boolean);
@@ -63,8 +76,8 @@ export function Recollection(props: {
     <figure className={cx('lt-recollection', lg && 'is-lg', `is-${state}`, props.className)} style={props.style}>
       {props.children && <div className="lt-recollection-media">{props.children}</div>}
       <blockquote className={lg ? 'memory-lg' : 'memory'}
-        aria-label={state === 'ghost' || state === 'lost' ? 'a memory with words missing' : undefined}>
-        {memoryText(props.text, state, props.seed)}
+        aria-label={forgottenWords(props.text, state, props.seed, props.keywords).size ? 'a memory with words missing' : undefined}>
+        {memoryText(props.text, state, props.seed, props.keywords)}
       </blockquote>
       <figcaption className="interface-sm">{bits.join(' · ')}</figcaption>
       {props.heldBy && props.heldBy.length > 0 && <div className="interface-sm">held by {props.heldBy.join(' · ')}</div>}

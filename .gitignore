@@ -18,6 +18,14 @@ coverage/
 # Deploy / tooling state
 .vercel/
 
+# Private QA, browser profiles, recordings, and artifact scratch files
+.tmp/
+.codex-finalizer/
+~$*
+*.mp4
+*.mov
+*.webm
+
 # Logs
 *.log
 npm-debug.log*

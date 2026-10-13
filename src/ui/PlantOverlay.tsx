@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, type CSSProperties } from 'react';
 import type { Kind } from '../engine';
+import { EPISODE_CHOICES, type EpisodeChoice } from '../data/episode';
 import { useGarden } from '../store/garden';
 import { Button, Overlay } from './ds';
 
@@ -34,8 +35,29 @@ export function PlantButton() {
 export function PlantOverlay() {
   const planting = useGarden((s) => s.planting);
   if (planting === 'kind') return <KindStep />;
+  if (planting === 'choices') return <EpisodeChoices />;
   if (planting === 'field') return <FieldStep />;
   return null;
+}
+
+function EpisodeChoices() {
+  const first = useRef<HTMLButtonElement>(null);
+  useEffect(() => first.current?.focus(), []);
+  const s = useGarden.getState;
+  return (
+    <Overlay className="plant-overlay surface" title="a fragment of this life" aria-label="choose a memory"
+      actions={<><Button onClick={() => { s().setDraftText(''); s().setDraftKind('sentence'); }}>write a memory</Button>
+        <Button onClick={() => s().closePlanting()}>cancel</Button></>}>
+      <div className="episode-choices">
+        {(Object.keys(EPISODE_CHOICES) as EpisodeChoice[]).map((choice, i) => (
+          <Button key={choice} ref={i === 0 ? first : undefined} onClick={() => s().selectEpisodeChoice(choice)}>
+            {EPISODE_CHOICES[choice].text}
+          </Button>
+        ))}
+      </div>
+      <p className="interface-sm plant-note">choose a fragment to see what it could join</p>
+    </Overlay>
+  );
 }
 
 function KindStep() {
@@ -69,10 +91,10 @@ function FieldStep() {
   useEffect(() => input.current?.focus(), [draft?.kind]);
   // Tag after a pause in typing; the store aborts a stale provider request when a newer one starts.
   useEffect(() => {
-    if (!draft) return;
+    if (!draft || draft.choice) return;
     const t = setTimeout(() => void tagDraft(), TAG_AFTER_MS);
     return () => clearTimeout(t);
-  }, [draft?.text, draft?.kind]);
+  }, [draft?.text, draft?.kind, draft?.choice]);
 
   if (!draft) return null;
   const chips = draft.tags ? [...draft.tags.people, ...draft.tags.places] : [];
@@ -83,14 +105,15 @@ function FieldStep() {
   return (
     <Overlay className="plant-overlay surface" aria-label="plant a memory"
       actions={<><Button onClick={closePlanting}>cancel</Button><Button variant="pill" disabled={!ready} onClick={plant}>plant</Button></>}>
-      <div className="lt-plant-kinds" role="radiogroup" aria-label="kind of memory">
+      {!draft.choice && <div className="lt-plant-kinds" role="radiogroup" aria-label="kind of memory">
         {KINDS.map((k) => (
           <button key={k} type="button" role="radio" aria-checked={k === draft.kind}
             className={`lt-kind interface-sm${k === draft.kind ? ' is-on' : ''}`}
             style={{ '--lt-hue': k === 'photo' && draft.hue ? draft.hue : KIND_HUE[k] } as CSSProperties}
             onClick={() => setDraftKind(k)}>{k}</button>
         ))}
-      </div>
+      </div>}
+      {draft.choice && <Button onClick={() => useGarden.getState().openPlanting('choices')}>choose another fragment</Button>}
 
       {draft.kind === 'photo' && (
         <div className="photo-pick">
@@ -102,7 +125,7 @@ function FieldStep() {
       )}
 
       {/* One memory, one line of thought (design system: "a sentence, not a journal entry"); it may wrap, as in p6. */}
-      <textarea ref={input} className="memory-lg plant-input" rows={2} value={draft.text} maxLength={280} aria-label="the memory"
+      <textarea ref={input} className="memory-lg plant-input" rows={2} value={draft.text} readOnly={!!draft.choice} maxLength={280} aria-label="the memory"
         placeholder={PLACEHOLDER[draft.kind]} onChange={(e) => setDraftText(e.target.value.replace(/\n/g, ' '))}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); plant(); } }} />
 
@@ -113,7 +136,7 @@ function FieldStep() {
             {chips.map((t) => (
               <span key={t.name} className="plant-chip interface">
                 {t.name}
-                <button type="button" className="plant-chip-x" aria-label={`not ${t.name}`} onClick={() => dropDraftTag(t.name)}>×</button>
+                {!draft.choice && <button type="button" className="plant-chip-x" aria-label={`not ${t.name}`} onClick={() => dropDraftTag(t.name)}>×</button>}
               </span>
             ))}
           </div>

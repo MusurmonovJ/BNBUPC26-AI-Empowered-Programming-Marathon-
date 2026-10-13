@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark"><title>Lethe interactive contest presentation</title>
+  <link rel="stylesheet" href="presentation.css">
+</head>
+<body>
+  <main aria-label="Lethe interactive presentation"><div class="stage" id="stage">
+    <section class="slide cover" data-title="A life becomes a garden" aria-label="A life becomes a garden">
+      <img class="scene" src="assets/garden.png" alt="A night garden of memories, joined by threads of light"><div class="veil"></div>
+      <div class="copy"><p class="kicker">your life as a world</p><h1>lethe</h1><p class="body">a life becomes a garden</p></div>
+      <p class="bottom-copy">what would you choose to keep in bloom?</p>
+    </section>
+    <section class="slide opening" data-title="A memory of your own" aria-label="A memory of your own">
+      <div class="copy"><p class="kicker">a moment for the room</p><h2>hold one memory<br>in your mind</h2>
+        <p class="body">you can keep it to yourself.<br>what kind of fragment is it?</p>
+        <div class="memory-kinds" role="group" aria-label="choose a memory kind">
+          <button class="word-button" data-memory="sentence" aria-pressed="false">a sentence</button>
+          <button class="word-button" data-memory="song" aria-pressed="false">a song</button>
+          <button class="word-button" data-memory="place" aria-pressed="false">a place</button>
+          <button class="word-button" data-memory="photo" aria-pressed="false">a photograph</button>
+        </div><p class="private-prompt" id="private-prompt" aria-live="polite">someone’s voice. a familiar room. one ordinary moment.</p>
+      </div>
+    </section>
+    <section class="slide planting" data-title="A fragment takes root" aria-label="A fragment takes root">
+      <img class="scene" id="planting-image" src="assets/planting.png" alt="A waiting seed with possible connections before planting">
+      <div class="copy narrow"><p class="kicker">a memory becomes a place</p><h2>a fragment<br>takes root</h2>
+        <p class="body">the words become a flower.<br>its connections become part of the world.</p>
+        <button class="word-button" id="planting-reveal">show the planting</button>
+        <p class="caption" id="planting-caption">a waiting seed, with the threads it could join</p>
+      </div>
+    </section>
+    <section class="slide memory" data-title="Grandma Mei's words" aria-label="Grandma Mei's words">
+      <img class="scene" src="assets/memory.png" alt="Grandma Mei's sentence and its connections in the real reference garden">
+      <div class="copy"><p class="kicker">one fictional life</p><h2>her words</h2>
+        <p class="quote">“You don’t have to be brave all the time.”</p>
+        <p class="body">grandma mei’s kitchen.<br>the music she played.<br>different moments, one person.</p>
+      </div>
+    </section>
+    <section class="slide connections" data-title="What the fragments share" aria-label="What the fragments share">
+      <img class="scene" src="assets/reveal.png" alt="A real garden reveal showing the memories held by Grandma Mei"><div class="veil"></div>
+      <div class="copy"><p class="kicker">relationships become visible</p><h2>what the fragments share</h2>
+        <button class="word-button" id="connections-reveal" aria-expanded="false" aria-controls="connections-explanation">show the connection</button></div>
+      <p class="explanation" id="connections-explanation" hidden>her words, her kitchen, and her music share grandma mei</p>
+    </section>
+    <section class="slide decision" data-title="One light and your choice" aria-label="One light and your choice">
+      <div class="copy"><p class="kicker">a choice for the audience</p><h2>one light.<br>where would you place it?</h2>
+        <p class="body">raise a hand for the memory you would tend.</p>
+        <div class="choices" role="group" aria-label="choose where the remaining light goes">
+          <button class="choice" data-choice="mei" aria-pressed="false"><span class="choice-name">grandma mei’s words</span><span class="choice-description">care travels to memories connected to her</span></button>
+          <button class="choice" data-choice="rooftop" aria-pressed="false"><span class="choice-name">the library rooftop</span><span class="choice-description">a place that matters on its own</span></button>
+        </div><p class="choice-response" id="choice-response" aria-live="polite">both choices belong to the same life.</p>
+      </div><p class="caption">we’ll take your choice into the living garden.</p>
+    </section>
+    <section class="slide live" data-title="The living garden" aria-label="The living garden">
+      <img class="scene" src="assets/first-thread.png" alt="A newly planted flower joins another memory through a first thread"><div class="veil"></div>
+      <div class="copy"><p class="kicker">the audience’s choice, in the game</p><h2>the living garden</h2>
+        <p class="body" id="live-choice">choose what to tend.<br>plant a fragment. let a season pass.</p>
+        <div class="live-actions"><button class="main-action" data-open-game>open the garden</button><button class="word-button" data-load-film>play your recording</button></div>
+        <p class="caption">the live game uses its real rules. the recorded route is a fallback.</p>
+      </div>
+    </section>
+    <section class="slide season" id="season-slide" data-title="A season passes" aria-label="A season passes">
+      <img class="scene before" src="assets/garden.png" alt="The reference garden before time passes">
+      <img class="scene after" src="assets/dusk.png" alt="The reference garden at dusk, with flowers softening to outlines"><div class="veil"></div>
+      <div class="copy"><p class="kicker">attention has consequences</p><h2>a season passes</h2>
+        <p class="body" id="season-line">some moments keep their color.<br>others settle into dusk.</p>
+        <button class="word-button" id="season-reveal" aria-pressed="false">let dusk settle</button>
+      </div>
+    </section>
+    <section class="slide seed" data-title="The quiet space" aria-label="The quiet space">
+      <img class="scene" src="assets/loss.png" alt="A dark seed remains after a memory's flower fades"><div class="veil"></div>
+      <div class="copy"><p class="kicker">a pause, rather than a verdict</p><h2>a seed remains</h2>
+        <p class="body">the words remain.<br>we can return to them.<br>for now, this space is quiet.</p></div>
+      <p class="hold-copy">let this moment breathe</p>
+    </section>
+    <section class="slide portrait" data-title="What holds this life" aria-label="What holds this life">
+      <img class="scene" src="assets/reveal.png" alt="The visible relationships around Grandma Mei in the garden">
+      <div class="copy"><p class="kicker">the world becomes a portrait</p><h2>what holds<br>this life</h2>
+        <p class="body">people and places emerge<br>from the memories that remain.</p>
+        <button class="word-button" id="portrait-reveal" aria-expanded="false" aria-controls="portrait-labels">reveal the relationships</button>
+        <p class="portrait-labels" id="portrait-labels" hidden>grandma mei<br>leo<br>hangzhou</p>
+      </div>
+    </section>
+    <section class="slide craft" data-title="A world you can make your own" aria-label="A world you can make your own">
+      <div class="copy"><p class="kicker">beyond the fictional garden</p><h2>a world you can<br>make your own</h2>
+        <p class="body">plant your own memories and discover their connections.</p>
+        <div class="craft-points"><p>each flower grows from a stable identity</p><p>shared people and places create relationships</p><p>your personal garden lives in this browser</p></div>
+      </div><p class="caption">planting works with local tagging. an optional provider can receive memory text and known entity names to improve suggestions.</p>
+    </section>
+    <section class="slide ending" data-title="What will you carry" aria-label="What will you carry">
+      <img class="scene" src="assets/dusk.png" alt="A changed garden with flowers, outlines, and quiet spaces">
+      <div class="copy"><p class="kicker">return to the memory you imagined</p><h2>you cannot keep every<br>moment in bloom</h2>
+        <p class="closing">what you tend gives the garden its shape</p>
+        <p class="personal-return" id="personal-return">what would your garden carry?</p>
+        <div class="live-actions"><button class="main-action" data-open-game>plant a memory</button><a class="word-button" id="vote-link" target="_blank" rel="noopener" hidden>vote for lethe</a></div>
+        <p class="vote-invitation">if this stayed with you, i would appreciate your vote.</p>
+        <a class="site" id="site-link" href="https://lethe-nine.vercel.app/" target="_blank" rel="noopener">lethe-nine.vercel.app</a>
+      </div>
+    </section>
+  </div></main>
+  <nav class="controls" aria-label="presentation controls">
+    <span class="route-select" role="group" aria-label="presentation route"><button id="short-route" aria-pressed="false">3 min</button><button id="full-route" aria-pressed="true">showcase</button></span>
+    <button id="previous">previous</button><output id="position" aria-live="polite"></output><button id="next">next</button>
+    <button id="fullscreen">fullscreen</button><button id="speaker">speaker view</button><button id="notes-toggle" aria-expanded="false" aria-controls="notes">notes</button><button id="links-toggle">links</button>
+  </nav>
+  <aside class="notes" id="notes" aria-label="speaker notes" hidden></aside>
+  <section class="overlay" id="game-overlay" aria-label="live garden" hidden>
+    <header><p id="game-cue">carry the audience’s choice into the garden</p><span><a id="game-new-tab" target="_blank" rel="noopener">open in another tab</a><button id="game-close">return to slides</button></span></header>
+    <iframe id="game-frame" title="Lethe live garden" allow="autoplay; fullscreen"></iframe>
+  </section>
+  <section class="overlay" id="film-overlay" aria-label="recorded garden" hidden>
+    <header><p>your local garden recording</p><button id="film-close">return to slides</button></header><video id="film" controls playsinline></video>
+  </section>
+  <input id="film-file" type="file" accept="video/*" hidden>
+  <div class="dialog-backdrop" id="links-dialog" hidden>
+    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="links-title">
+      <h3 id="links-title">presentation links</h3>
+      <label for="demo-url">live garden URL<input id="demo-url" type="url" autocomplete="off" spellcheck="false"></label>
+      <label for="vote-url">contest voting URL, if available<input id="vote-url" type="url" autocomplete="off" spellcheck="false" placeholder="https://"></label>
+      <p class="caption">use the verified deployed episode or your local development URL. links stay in this browser. the slide never invents a voting destination.</p>
+      <p class="status" id="link-status" aria-live="polite"></p>
+      <div class="dialog-actions"><button class="main-action" id="apply-links">use these links</button><button class="word-button" id="links-close">back</button><button class="word-button" id="reset-choices">clear room choices</button></div>
+    </section>
+  </div>
+  <script src="presentation.js"></script>
+</body>
+</html>

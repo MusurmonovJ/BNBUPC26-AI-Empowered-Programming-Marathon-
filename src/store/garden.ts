@@ -5,24 +5,28 @@
 
 import { create } from 'zustand';
 import {
-  canPlant, emptyGarden, gardenNow, holders, letGo, plant, retag, returnTo, tend, viewAll, visit,
+  advance, canPlant, canReturn, canTend, C, emptyGarden, gardenNow, holders, letGo, neighbours, plant, retag, returnTo, tend, viewAll, visit,
   type Garden, type Kind, type MemoryView, type ReturnSummary,
 } from '../engine';
 import type { Tags } from '../engine/garden';
 import { FIRST_PLANTING_PLACES, layoutOf, placeNew, type Place } from '../data/placement';
 import { FIRST_PROMPTS, sampleGarden } from '../data/sample';
 import { stressGarden } from '../data/stress';
+import { CLOSING_LINES, episodeGarden, EPISODE_CHOICES, EPISODE_CHOICE_LINE, EPISODE_DAY, EPISODE_DAYS, EPISODE_PLACES, type EpisodeChoice } from '../data/episode';
 import { offlineTag } from '../tagging/offline';
 import { apiTag, type TagSource } from '../tagging/tag';
 import { dominantColor } from '../ui/photo';
-import { ALONE_WHISPER, RULE_WHISPER } from '../ui/whispers';
+import { ALONE_WHISPER, RULE_WHISPER, nameOf } from '../ui/whispers';
+import { sceneReady } from './sceneReady';
 import { forget, keep, load, markKept } from './persist';
+import { onPresentationResume, presentationClock } from './presentationClock';
 
 type Clock = { debugOffset: number };
 type DraftTags = { people: Tags; places: Tags; feelings: Tags };
 
 /** A memory being written in the plant overlay (screens p4–p6). */
 export type Draft = {
+  choice?: EpisodeChoice;
   kind: Kind;
   text: string;
   /** Photo memories: the chosen image (written with the garden once planted) and its colour. */
@@ -36,11 +40,72 @@ export type Draft = {
   place: Place;
 };
 
-export type PlantingStep = 'closed' | 'kind' | 'field';
+export type PlantingStep = 'closed' | 'kind' | 'field' | 'choices';
+export type Episode = {
+  mode: 'play' | 'film';
+  stage: 'exploring' | 'passing' | 'reflecting' | 'finished';
+  day: number;
+  plantingUsed: boolean;
+  continued: boolean;
+  extraPlants: number;
+  tended: string[];
+  planted: string[];
+  returned: string[];
+  letGo: string[];
+  before: Record<string, MemoryView>;
+  after: Record<string, MemoryView>;
+  summary: ReturnSummary | null;
+};
+export type Presentation = { overview: boolean; holderId: string | null; headId: string | null; quiet: boolean; line: string | null };
+const NO_PRESENTATION: Presentation = { overview: false, holderId: null, headId: null, quiet: false, line: null };
+const freshEpisode = (mode: Episode['mode']): Episode => ({
+  mode, stage: 'exploring', day: EPISODE_DAY, plantingUsed: false, continued: false, extraPlants: 0,
+  tended: [], planted: [], returned: [], letGo: [], before: {}, after: {}, summary: null,
+});
+
+export function episodeReflection(garden: Garden, episode: Episode): string {
+  const returned = episode.returned.at(-1);
+  if (returned && garden.memories[returned] && !garden.memories[returned].lost) return `you returned to ${nameOf(garden.memories[returned]).toLowerCase()}.`;
+  if (episode.planted.includes('ep-choice-rooftop') && garden.threads.some((t) =>
+    [t.a, t.b].includes('m10') && [t.a, t.b].includes('ep-choice-rooftop'))) return 'the rooftop found a thread to leo.';
+  const tended = episode.tended.at(-1);
+  if (tended === 'm1') return 'you tended grandma mei’s words.';
+  if (tended && garden.memories[tended]) return `you tended ${nameOf(garden.memories[tended]).toLowerCase()}.`;
+  const planted = episode.planted.at(-1);
+  if (planted && garden.memories[planted]) return 'a new memory found its place in this life.';
+  return 'the garden has changed. what remains still belongs to this life.';
+}
+
+onPresentationResume((duration) => {
+  const s = useGarden.getState();
+  if (!s.episode || !duration) return;
+  // Animation events use wall performance time; shift them alongside the paused presentation clock.
+  // Keep event object identity, so the sound system does not replay previously heard events.
+  for (const e of s.events) e.at += duration;
+  useGarden.setState({ events: [...s.events] });
+});
 /** Where the person is: the threshold (screen p7), the first plantings (p8–p10), or the garden itself. */
 export type Phase = 'threshold' | 'first' | 'garden';
 
 type GardenStore = {
+  episode: Episode | null;
+  generation: number;
+  plantingPending: boolean;
+  presentation: Presentation;
+  /**
+   * Start the fictional episode. With `prepareMs`, it is prepared behind the threshold while that fades: the phase
+   * stays, and its seeds wait in the dark until `prepareMs` has passed; `openEpisode` then opens it without a reset.
+   */
+  beginEpisode: (mode: Episode['mode'], prepareMs?: number) => void;
+  openEpisode: () => void;
+  selectEpisodeChoice: (choice: EpisodeChoice) => void;
+  plantEpisodeChoice: (choice: EpisodeChoice) => Promise<string | null>;
+  advanceEpisode: () => void;
+  finishEpisode: () => void;
+  continueEpisode: () => void;
+  restartEpisode: () => void;
+  setPresentation: (patch: Partial<Presentation>) => void;
+  stopPresentation: () => void;
   garden: Garden;
   clock: Clock;
   views: Record<string, MemoryView>;
@@ -60,7 +125,8 @@ type GardenStore = {
   /** Which tagger tagged each memory planted this session (for checking the providers on the live site). */
   tagSources: Record<string, TagSource>;
   /** Ids that just bloomed or were tended, for one-shot animations. */
-  events: { type: 'bloom' | 'tend' | 'ripple' | 'dissolve' | 'beckon'; id: string; at: number }[];
+  /** `quiet`: the garden growing in on entry (no new-thread chord; each flower sounds its note as it lands). */
+  events: { type: 'bloom' | 'tend' | 'ripple' | 'dissolve' | 'beckon'; id: string; at: number; quiet?: boolean }[];
   planting: PlantingStep;
   phase: Phase;
   /** Whose garden is on screen: your own (kept in this browser) or the demo garden (never kept). */
@@ -74,7 +140,8 @@ type GardenStore = {
   /** The settings overlay (P10.2), opened from "lethe" top-left. */
   settings: boolean;
   /** "watch a season" (D20): the garden plays its own story, and says one line at a time beneath it. */
-  story: { running: boolean; line: string | null };
+  /** The film: whether it plays, its caption, and a title card in the sky for its turning points. */
+  story: { running: boolean; line: string | null; title?: string | null };
   draft: Draft | null;
 
   now: () => number;
@@ -86,7 +153,7 @@ type GardenStore = {
   letGoMemory: (id: string) => void;
   returnToMemory: (id: string) => void;
   plantMemory: (kind: Kind, text: string, extra?: {
-    hue?: string; photoId?: string; place?: Place; tags?: DraftTags; tagSource?: TagSource; dropped?: string[];
+    hue?: string; photoId?: string; place?: Place; tags?: DraftTags; tagSource?: TagSource; dropped?: string[]; choice?: EpisodeChoice;
   }) => Promise<string | null>;
   arrive: () => void;
   /** Hidden slider: put the ten sample memories back as they were. */
@@ -97,6 +164,12 @@ type GardenStore = {
   beginOwn: () => void;
   /** Threshold: see the demo garden (the ten sample memories). */
   seeDemo: () => void;
+  /**
+   * Threshold, at the click: reset the demo garden while the threshold is still fading, its seeds waiting in the
+   * dark until `afterMs` has passed. `openDemo` then opens it without resetting it again.
+   */
+  prepareDemo: (afterMs: number) => void;
+  openDemo: () => void;
   /** First plantings: plant the current prompt's memory, or skip it. */
   plantPrompt: (text: string, photo?: File) => Promise<void>;
   skipPrompt: () => void;
@@ -129,7 +202,8 @@ const urlDays = typeof location !== 'undefined' ? Number(new URLSearchParams(loc
 /** ?stress=N (P12.1): open a seeded garden of N memories instead of the demo, to check the frame rate. */
 const urlStress = typeof location !== 'undefined' ? Math.min(400, Number(new URLSearchParams(location.search).get('stress')) || 0) : 0;
 /** ?demo (or any preview/sandbox/stress link) opens straight into the garden; otherwise the threshold comes first. */
-const startPhase: Phase = typeof location !== 'undefined' && /[?&](demo|days|sandbox|stress)\b/.test(location.search) ? 'garden' : 'threshold';
+const demoMode = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('demo') : null;
+const startPhase: Phase = demoMode === 'film' ? 'threshold' : typeof location !== 'undefined' && /[?&](demo|days|sandbox|stress)\b/.test(location.search) ? 'garden' : 'threshold';
 /** "A season passes" (P8.3): after the first plantings, this many garden days go by, shown with the return replay. */
 const SEASON_DAYS = 10;
 /** Let the last bloom finish and the line be read before the season passes. */
@@ -142,6 +216,15 @@ let sayTimer: ReturnType<typeof setTimeout> | null = null;
 /** The rule is said when the demo garden opens; a memory planted alone hears it once its bloom has settled. */
 const RULE_FOR_MS = 7000;
 const ALONE_AFTER_MS = 2400;
+/**
+ * Entering the demo garden, it grows in: each seed falls and blooms, left to right, 160ms apart (the bloom's own
+ * beats), and the threads light once both their flowers have grown. On a ?demo link the wait is longer, so the
+ * first frame has been drawn before the first seed falls.
+ */
+const GROW_IN_AFTER_MS = 450;
+/** A ?demo link grows in once the scene's shaders are compiled, and never waits longer than this. */
+const SCENE_READY_MAX_MS = 4000;
+const GROW_IN_STAGGER_MS = 160;
 const isDemoLink = typeof location !== 'undefined' && /[?&]demo\b/.test(location.search);
 let nextId = 0;
 const newId = (prefix = 'm') => `${prefix}${Date.now().toString(36)}${(nextId++).toString(36)}`;
@@ -158,14 +241,17 @@ const REPLAY_TICK_MS = 120;
 const DISSOLVE_AFTER_MS = 1500;
 const BECKON_AFTER_MS = 3000;
 /** The kept garden, read once at start while the threshold shows (preview and demo links never read it). */
-let kept = startPhase === 'threshold' ? load() : Promise.resolve(null);
+let kept = load();
+let episodeTimer: ReturnType<typeof setInterval> | null = null;
+const stopEpisodeTimer = () => { if (episodeTimer) clearInterval(episodeTimer); episodeTimer = null; };
 
 let replayTimer: ReturnType<typeof setInterval> | null = null;
 const stopReplay = () => { if (replayTimer) clearInterval(replayTimer); replayTimer = null; };
 
 export const useGarden = create<GardenStore>((set, get) => {
   const stress = urlStress ? stressGarden(urlStress, 100, realNow()) : null;
-  const initial = stress?.garden ?? sampleGarden(100, realNow());
+  const startingEpisode = demoMode === 'play' ? episodeGarden(realNow()) : null;
+  const initial = startingEpisode?.garden ?? stress?.garden ?? sampleGarden(100, realNow());
   // Any change to the garden ends a replay: the garden shows what is true now.
   const withViews = (g: Garden, now: number) => {
     stopReplay();
@@ -183,10 +269,25 @@ export const useGarden = create<GardenStore>((set, get) => {
    * proper return visit (light, losses, summary), so no action ever writes timestamps from a preview.
    */
   const commitPreview = () => { if (get().clock.debugOffset !== 0) get().arrive(); };
+  const episodeEditable = () => !get().episode || get().episode?.stage === 'exploring' || (get().episode?.stage === 'finished' && get().episode?.continued);
+  const remember = (field: 'tended' | 'planted' | 'returned' | 'letGo', id: string) => {
+    const e = get().episode;
+    if (e) set({ episode: { ...e, [field]: [...new Set([...e[field], id])] } });
+  };
+  const cancelSession = () => {
+    hush(); stopReplay(); stopEpisodeTimer();
+    if (seasonTimer) clearTimeout(seasonTimer);
+    seasonTimer = null;
+    draftRequest?.abort();
+    set({ generation: get().generation + 1, episode: null, plantingPending: false,
+      story: { running: false, line: null, title: null }, presentation: { ...NO_PRESENTATION } });
+  };
   const emit = (type: GardenStore['events'][number]['type'], ids: string[], at: (id: string) => number = () => performance.now()) =>
     set((s) => ({ events: [...s.events.filter((e) => performance.now() - e.at < 8000), ...ids.map((id) => ({ type, id, at: at(id) }))] }));
   /** The next free spot in the garden, for a memory about to be planted. */
   const nextPlace = () => {
+    const e = get().episode;
+    if (e) return e.continued ? EPISODE_PLACES.extra[Math.min(e.extraPlants, 2)] : EPISODE_PLACES.custom;
     const { garden, positions } = get();
     const ids = Object.keys(garden.memories);
     return placeNew(Object.values(layoutOf(ids, positions)), ids.length * 7 + 3);
@@ -222,18 +323,149 @@ export const useGarden = create<GardenStore>((set, get) => {
     if (saying && get().whisperOverride === saying) set({ whisperOverride: null });
     saying = null;
   };
-  // A judge's link (?demo) opens on the rule, before anything else is said.
-  if (isDemoLink) setTimeout(() => say(RULE_WHISPER), 0);
+  // A judge's link (?demo) grows the garden in and opens on the rule, before anything else is said. Its seeds wait
+  // in the dark while the scene compiles its shaders (sceneReady), so the first bloom never stutters.
+  if (isDemoLink && demoMode !== 'film') {
+    setTimeout(() => {
+      const generation = get().generation;
+      growIn(SCENE_READY_MAX_MS);
+      void Promise.race([sceneReady, new Promise((r) => setTimeout(r, SCENE_READY_MAX_MS))])
+        .then(() => { if (get().generation !== generation) return; growIn(GROW_IN_AFTER_MS); say(get().episode ? EPISODE_CHOICE_LINE : RULE_WHISPER); });
+    }, 0);
+  }
+  /** The garden grows in: one quiet bloom per memory, left to right across the canvas. */
+  const growIn = (afterMs: number) => {
+    const ids = Object.keys(get().garden.memories);
+    const layout = layoutOf(ids, get().positions);
+    const order = [...ids].sort((a, b) => layout[a].x - layout[b].x);
+    const t0 = performance.now() + afterMs;
+    set({ events: order.map((id, i) => ({ type: 'bloom' as const, id, at: t0 + i * GROW_IN_STAGGER_MS, quiet: true })) });
+  };
   const setDraft = (patch: Partial<Draft>) => set((s) => (s.draft ? { draft: { ...s.draft, ...patch } } : {}));
 
   const initialViews = viewAll(initial, 100 + urlDays);
   return {
+    episode: startingEpisode ? freshEpisode('play') : null,
+    generation: 0,
+    plantingPending: false,
+    presentation: { ...NO_PRESENTATION },
+    beginEpisode: (mode, prepareMs) => {
+      cancelSession();
+      const { garden, positions } = episodeGarden(realNow());
+      const views = viewAll(garden, EPISODE_DAY);
+      const prepared = prepareMs !== undefined;
+      set({ garden, positions, views, shown: views, episode: freshEpisode(mode), owner: 'demo', ...(prepared ? {} : { phase: 'garden' as const }),
+        clock: { debugOffset: 0 }, events: [], returnSummary: null, hoveredId: null, focusedId: null, whisperOverride: null,
+        planting: 'closed', draft: null, settings: false, reveal: { open: false, entityId: null }, tagSources: {} });
+      const generation = get().generation;
+      const started = performance.now();
+      growIn(SCENE_READY_MAX_MS + (prepareMs ?? 0));
+      void Promise.race([sceneReady, new Promise((r) => setTimeout(r, SCENE_READY_MAX_MS))]).then(() => {
+        if (get().generation !== generation) return;
+        // Behind the threshold, the seeds fall just as it finishes fading.
+        growIn(Math.max(0, (prepareMs ?? 0) - (performance.now() - started)) + GROW_IN_AFTER_MS);
+        if (!prepared && mode === 'play') say(EPISODE_CHOICE_LINE);
+      });
+    },
+    openEpisode: () => {
+      const e = get().episode;
+      if (!e) return;
+      set({ phase: 'garden' });
+      if (e.mode === 'play') say(EPISODE_CHOICE_LINE);
+    },
+    selectEpisodeChoice: (choice) => {
+      if (!get().episode || !get().canPlantNow()) return;
+      const m = EPISODE_CHOICES[choice];
+      set({ planting: 'field', focusedId: null, settings: false, reveal: { open: false, entityId: null },
+        draft: { choice, kind: m.kind, text: m.text, photoId: undefined, tags: { people: m.people, places: m.places, feelings: [] },
+          source: 'offline', dropped: [], place: EPISODE_PLACES[choice] } });
+    },
+    plantEpisodeChoice: async (choice) => {
+      if (!get().episode) return null;
+      const m = EPISODE_CHOICES[choice];
+      return get().plantMemory(m.kind, m.text, { choice, place: EPISODE_PLACES[choice],
+        tags: { people: m.people, places: m.places, feelings: [] } });
+    },
+    advanceEpisode: () => {
+      const e = get().episode;
+      if (!e || e.stage !== 'exploring' || get().plantingPending) return;
+      hush(); stopReplay(); stopEpisodeTimer(); draftRequest?.abort();
+      const before = viewAll(get().garden, e.day);
+      const g = structuredClone(get().garden);
+      const day = e.day + EPISODE_DAYS;
+      const summary = advance(g, e.day, day);
+      const views = viewAll(g, day);
+      const changed = Object.keys(views).filter((id) => views[id].state !== before[id].state || Math.abs(views[id].vitality - before[id].vitality) > 0.02);
+      // Frame the rooftop first if it really is lost; all other changes remain real engine outcomes.
+      changed.sort((a, b) => Number(b === 'm10') - Number(a === 'm10'));
+      const wallStart = performance.now() + 400;
+      const activeStart = presentationClock.now();
+      const offset = (id: string) => 400 + Math.max(0, changed.indexOf(id)) / Math.max(1, changed.length - 1) * 1200;
+      set({ garden: g, views, shown: before, replaying: true, episode: { ...e, stage: 'passing', day, before, after: views, summary },
+        returnSummary: summary, planting: 'closed', draft: null, settings: false, reveal: { open: false, entityId: null },
+        presentation: { ...NO_PRESENTATION, headId: summary.lost.includes('m10') ? 'm10' : null,
+          line: e.mode === 'play' ? 'a season passes. some moments settle into dusk.' : null } });
+      emit('dissolve', summary.lost, (id) => wallStart + offset(id) - 400 + DISSOLVE_AFTER_MS);
+      emit('beckon', summary.aboutToBeLost, (id) => wallStart + offset(id) - 400 + BECKON_AFTER_MS);
+      const generation = get().generation;
+      episodeTimer = setInterval(() => {
+        if (get().generation !== generation) { stopEpisodeTimer(); return; }
+        const age = presentationClock.now() - activeStart;
+        const due = changed.filter((id) => age >= offset(id));
+        set({ shown: { ...before, ...Object.fromEntries(due.map((id) => [id, views[id]])) } });
+        if (age < 8000) return;
+        stopEpisodeTimer();
+        set({ shown: views, replaying: false, presentation: { ...get().presentation, headId: null } });
+        if (!get().story.running) get().finishEpisode();
+      }, REPLAY_TICK_MS);
+    },
+    finishEpisode: () => {
+      const e = get().episode;
+      if (!e || get().replaying || e.stage === 'exploring' || e.stage === 'finished') return;
+      if (e.stage === 'reflecting') {
+        if (!get().story.running) { stopEpisodeTimer(); set({ episode: { ...e, stage: 'finished' } }); }
+        return;
+      }
+      stopEpisodeTimer();
+      const top = holders(get().garden, e.day)[0]?.entityId ?? null;
+      set({ episode: { ...e, stage: 'reflecting' }, focusedId: null, hoveredId: null,
+        presentation: { ...NO_PRESENTATION, overview: true, line: episodeReflection(get().garden, e) } });
+      if (get().story.running) return; // the film owns its absolute timeline
+      const start = presentationClock.now(), generation = get().generation;
+      episodeTimer = setInterval(() => {
+        if (get().generation !== generation) { stopEpisodeTimer(); return; }
+        const age = presentationClock.now() - start;
+        set({ presentation: { ...get().presentation, holderId: age >= 4000 ? top : null,
+          line: age >= 9000 ? CLOSING_LINES[1] : age >= 4000 ? CLOSING_LINES[0] : episodeReflection(get().garden, e) } });
+        if (age >= 14000) {
+          stopEpisodeTimer();
+          set({ episode: { ...get().episode!, stage: 'finished' } });
+        }
+      }, REPLAY_TICK_MS);
+    },
+    continueEpisode: () => {
+      const e = get().episode;
+      if (!e || e.stage !== 'finished' || e.continued) return;
+      const garden = structuredClone(get().garden);
+      garden.light = Math.min(C.LIGHT_MAX, garden.light + C.LIGHT_PER_REAL_DAY);
+      set({ ...withViews(garden, e.day), episode: { ...e, continued: true }, presentation: { ...NO_PRESENTATION },
+        focusedId: null, reveal: { open: false, entityId: null }, whisperOverride: null, returnSummary: null });
+    },
+    restartEpisode: () => get().beginEpisode('play'),
+    setPresentation: (patch) => set({ presentation: { ...get().presentation, ...patch } }),
+    stopPresentation: () => {
+      const e = get().episode;
+      if (e?.stage === 'reflecting') stopEpisodeTimer();
+      set({ presentation: { ...NO_PRESENTATION }, story: { running: false, line: null, title: null },
+        episode: e ? { ...e, mode: 'play', stage: e.stage === 'reflecting' ? 'finished' : e.stage } : null });
+      if (e?.stage === 'passing' && !get().replaying) get().finishEpisode();
+    },
     garden: initial,
     clock: { debugOffset: urlDays },
     views: initialViews,
     shown: initialViews,
     replaying: false,
-    positions: stress?.positions ?? {},
+    positions: startingEpisode?.positions ?? stress?.positions ?? {},
     photos: {},
     hoveredId: null,
     focusedId: null,
@@ -247,39 +479,52 @@ export const useGarden = create<GardenStore>((set, get) => {
     whisperOverride: null,
     reveal: { open: false, entityId: null },
     settings: false,
-    story: { running: false, line: null },
+    story: { running: false, line: null, title: null },
     draft: null,
 
     now: () => {
-      const { garden, clock } = get();
+      const { garden, clock, episode } = get();
+      if (episode) return episode.day;
       return gardenNow(garden.lastSeenAt, garden.lastSeenReal, realNow(), clock.debugOffset);
     },
-    refresh: () => { stopReplay(); const views = viewAll(get().garden, get().now()); set({ views, shown: views, replaying: false }); },
+    refresh: () => { if (get().episode?.stage === 'passing') return; stopReplay(); const views = viewAll(get().garden, get().now()); set({ views, shown: views, replaying: false }); },
 
     // Hidden time slider: scrubbing only previews. `arrive()` commits the elapsed time like a real return visit.
-    setDebugOffset: (d) => { set({ clock: { debugOffset: d } }); get().refresh(); },
+    setDebugOffset: (d) => { if (get().episode) return; set({ clock: { debugOffset: d } }); get().refresh(); },
 
     hover: (id) => set({ hoveredId: id }),
     focus: (id) => set({ focusedId: id }),
 
     tendMemory: (id) => {
+      if (!episodeEditable() || !canTend(get().garden, id)) return;
       commitPreview();
       let rippled: string[] = [];
       mutate((g, now) => { rippled = tend(g, id, now); });
       emit('tend', [id]); emit('ripple', rippled);
+      remember('tended', id);
     },
-    letGoMemory: (id) => { commitPreview(); mutate((g, now) => letGo(g, id, now)); emit('dissolve', [id]); },
-    returnToMemory: (id) => { commitPreview(); mutate((g, now) => returnTo(g, id, now)); emit('bloom', [id]); },
+    letGoMemory: (id) => {
+      if (!episodeEditable() || !get().garden.memories[id] || get().garden.memories[id].lost) return;
+      commitPreview(); mutate((g, now) => letGo(g, id, now)); emit('dissolve', [id]); remember('letGo', id);
+    },
+    returnToMemory: (id) => {
+      if (!episodeEditable() || !canReturn(get().garden, id)) return;
+      commitPreview(); mutate((g, now) => returnTo(g, id, now)); emit('bloom', [id]); remember('returned', id);
+    },
 
     plantMemory: async (kind, text, extra = {}) => {
+      if (!text.trim() || !get().canPlantNow()) return null;
+      const generation = get().generation;
+      set({ plantingPending: true });
+      try {
       commitPreview();
       const { garden } = get();
-      if (!canPlant(garden, realNow())) return null;
       // Plant at once: with the draft's tags if it has them, otherwise the offline tagger (in the browser, no network).
       const dropped = extra.dropped ?? [];
       const tags = extra.tags ?? dropTags(await offlineTag(garden, kind, text), dropped);
+      if (get().generation !== generation || !episodeEditable()) return null;
       const source = extra.tags ? extra.tagSource ?? 'offline' : 'offline';
-      const id = newId();
+      const id = extra.choice && get().episode && !get().garden.memories[EPISODE_CHOICES[extra.choice].id] ? EPISODE_CHOICES[extra.choice].id : newId();
       const place = extra.place ?? nextPlace();
       set((s) => ({ positions: { ...s.positions, [id]: place } }));
       mutate((g, now) => {
@@ -287,24 +532,28 @@ export const useGarden = create<GardenStore>((set, get) => {
       });
       set((s) => ({ tagSources: { ...s.tagSources, [id]: source } }));
       emit('bloom', [id]);
+      const e = get().episode;
+      if (e) set({ episode: { ...e, plantingUsed: true, extraPlants: e.extraPlants + (e.continued ? 1 : 0), planted: [...e.planted, id] } });
       // Planted alone: once it has grown, the garden says how memories hold each other (not in the first plantings,
       // where the season and its return speak next).
       if (get().phase === 'garden' && !get().garden.threads.some((t) => t.a === id || t.b === id)) say(ALONE_WHISPER, ALONE_AFTER_MS);
       // Offline tags only: ask the provider in the background; if it answers in time, its tags replace them.
-      if (source === 'offline') {
+      if (source === 'offline' && !get().episode) {
         void apiTag(get().garden, kind, text).then((better) => {
-          if (!better || !get().garden.memories[id]) return;
+          if (!better || get().generation !== generation || !get().garden.memories[id]) return;
           mutate((g) => retag(g, id, dropTags(better, dropped)));
           set((s) => ({ tagSources: { ...s.tagSources, [id]: better.source } }));
         });
       }
       return id;
+      } finally { if (get().generation === generation) set({ plantingPending: false }); }
     },
 
     // Return visit: apply the time away, then replay it. The garden first shows how it was, and each memory eases
     // to how it is now, one after another (most changed first), while the fog rises. Lost ones dissolve once they have
     // become ghosts; ghosts about to be lost glow once, so they can still be saved.
     arrive: () => {
+      if (get().episode) return;
       hush();
       const before = viewAll(get().garden, get().garden.lastSeenAt);
       const g = structuredClone(get().garden);
@@ -331,10 +580,7 @@ export const useGarden = create<GardenStore>((set, get) => {
     },
 
     resetDemo: () => {
-      hush();
-      stopReplay();
-      if (seasonTimer) clearTimeout(seasonTimer);
-      draftRequest?.abort();
+      cancelSession();
       const g = sampleGarden(100, realNow());
       const views = viewAll(g, 100);
       set({
@@ -342,15 +588,21 @@ export const useGarden = create<GardenStore>((set, get) => {
         clock: { debugOffset: 0 }, returnSummary: null, hoveredId: null, focusedId: null, planting: 'closed', draft: null,
         whisperOverride: null, reveal: { open: false, entityId: null }, owner: 'demo', settings: false,
       });
+      growIn(GROW_IN_AFTER_MS);
     },
 
     /* ---------- the threshold and the first plantings (P8) ---------- */
 
-    seeDemo: () => { get().resetDemo(); set({ phase: 'garden' }); say(RULE_WHISPER); },
+    seeDemo: () => { get().resetDemo(); get().openDemo(); },
+    prepareDemo: (afterMs) => { get().resetDemo(); growIn(afterMs + GROW_IN_AFTER_MS); },
+    openDemo: () => { set({ phase: 'garden' }); say(RULE_WHISPER); },
 
     // Coming back: the garden as it was left, then the time away, played as the return replay (P7.1).
     enterOwn: async () => {
+      cancelSession();
+      const generation = get().generation;
       const found = await kept;
+      if (get().generation !== generation) return;
       if (!found) { get().beginOwn(); return; }
       const { stored, photos } = found;
       markKept(Object.keys(photos));
@@ -367,8 +619,7 @@ export const useGarden = create<GardenStore>((set, get) => {
     },
 
     beginOwn: () => {
-      stopReplay();
-      draftRequest?.abort();
+      cancelSession();
       const g = emptyGarden(realNow());
       const views = viewAll(g, 0);
       set({
@@ -418,8 +669,7 @@ export const useGarden = create<GardenStore>((set, get) => {
       ...(patch.running === false && s.story.running ? { returnSummary: null } : {}),
     })),
     letGardenGo: async () => {
-      stopReplay();
-      if (seasonTimer) clearTimeout(seasonTimer);
+      cancelSession();
       if (keepTimer) clearTimeout(keepTimer);
       keepTimer = null;
       draftRequest?.abort();
@@ -438,19 +688,23 @@ export const useGarden = create<GardenStore>((set, get) => {
 
     /* ---------- planting (screens p4–p6) ---------- */
 
-    canPlantNow: () => canPlant(get().garden, realNow()),
+    canPlantNow: () => {
+      if (get().plantingPending || !episodeEditable()) return false;
+      const e = get().episode;
+      return e ? e.continued ? e.extraPlants < 3 : !e.plantingUsed : canPlant(get().garden, realNow());
+    },
 
     openPlanting: (step = 'kind', kind = 'sentence') => {
       if (!get().canPlantNow()) return;
       const draft = get().draft;
       set({
-        planting: step, focusedId: null, settings: false,
+        planting: get().episode && step === 'kind' ? 'choices' : step, focusedId: null, settings: false, reveal: { open: false, entityId: null },
         draft: draft ?? { kind, text: '', tags: null, source: null, dropped: [], place: nextPlace() },
       });
     },
     closePlanting: () => { draftRequest?.abort(); set({ planting: 'closed', draft: null }); },
-    setDraftKind: (kind) => { set({ planting: 'field' }); setDraft({ kind, tags: null, source: null }); },
-    setDraftText: (text) => setDraft({ text }),
+    setDraftKind: (kind) => { set({ planting: 'field' }); setDraft({ kind, choice: undefined, tags: null, source: null }); },
+    setDraftText: (text) => setDraft({ text, choice: undefined }),
     setDraftPhoto: async (file) => {
       const photoId = newId('p');
       const url = URL.createObjectURL(file);
@@ -467,14 +721,16 @@ export const useGarden = create<GardenStore>((set, get) => {
     },
     tagDraft: async () => {
       const d = get().draft;
-      if (!d) return;
+      if (!d || d.choice) return;
+      const generation = get().generation;
       const { kind, text } = d;
       draftRequest?.abort();
       if (!text.trim()) { setDraft({ tags: null, source: null }); return; }
-      const still = () => get().draft?.text === text && get().draft?.kind === kind;
+      const still = () => get().generation === generation && get().draft?.text === text && get().draft?.kind === kind;
       const offline = await offlineTag(get().garden, kind, text);
       if (!still()) return;
       setDraft({ tags: dropTags(offline, get().draft!.dropped), source: 'offline' });
+      if (get().episode) return;
       const request = (draftRequest = new AbortController());
       const better = await apiTag(get().garden, kind, text, request.signal).catch(() => null);
       if (!better || request.signal.aborted || !still()) return;
@@ -486,7 +742,7 @@ export const useGarden = create<GardenStore>((set, get) => {
       draftRequest?.abort();
       set({ planting: 'closed', draft: null });
       return get().plantMemory(d.kind, d.text.trim(), {
-        hue: d.hue, photoId: d.photoId, place: d.place, dropped: d.dropped,
+        choice: d.choice, hue: d.hue, photoId: d.photoId, place: d.place, dropped: d.dropped,
         ...(d.tags ? { tags: d.tags, tagSource: d.source ?? 'offline' } : {}),
       });
     },
@@ -524,9 +780,25 @@ export function heldBy(g: Garden, entityId: string | null): string[] {
     .map((m) => m.id);
 }
 
+/**
+ * In the episode, what tending the open memory would reach: its living neighbours, exactly the memories `tend()`
+ * spills light into. Null when tending is not possible (no light, a lost memory, outside the episode's choices).
+ */
+export function useTendReach(): string[] | null {
+  const focusedId = useGarden((s) => s.focusedId);
+  const garden = useGarden((s) => s.garden);
+  const episode = useGarden((s) => s.episode);
+  if (!focusedId || !episode) return null;
+  const editable = episode.stage === 'exploring' || (episode.stage === 'finished' && episode.continued);
+  const m = garden.memories[focusedId];
+  if (!editable || !m || m.lost || garden.light < C.TEND_COST) return null;
+  return neighbours(garden, focusedId).map((n) => n.other).filter((id) => garden.memories[id] && !garden.memories[id].lost);
+}
+
 /** What the reveal lights right now: the chosen holder's memories, or null when the reveal is closed. */
 export function useRevealHeld(): string[] | null {
   const reveal = useGarden((s) => s.reveal);
+  const presentedHolder = useGarden((s) => s.presentation.holderId);
   const garden = useGarden((s) => s.garden);
-  return reveal.open ? heldBy(garden, reveal.entityId) : null;
+  return reveal.open ? heldBy(garden, reveal.entityId) : presentedHolder ? heldBy(garden, presentedHolder) : null;
 }

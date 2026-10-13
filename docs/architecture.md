@@ -157,7 +157,7 @@ sequenceDiagram
   F->>C: strict JSON schema (structured output)
   C-->>F: {people, places, feelings}
   F-->>T: JSON + x-lethe-tagger
-  Note over T,O: 503 / 429 / error / slower than 2.5s → offline tags instead
+  Note over T,O: 503 / 429 / error / slower than 4s → offline tags instead
   T-->>S: tags
   S->>E: suggestThreads(draft)
   S-->>G: dashed suggested threads
@@ -211,8 +211,14 @@ flowchart TD
   W7 --> G3
   G3 -- "lethe (top-left)" --> S8["8 Settings<br/>sound · export · let the garden go"]
   S8 --> G3
-  T1 -. "demo: see a garden" .-> G3
+  T1 -. "play a season" .-> E9["contest episode<br/>paused time · one light · one planting"]
+  T1 -. "watch a season" .-> F10["three-minute film<br/>two genuine visits to the same life"]
+  E9 -- "let a season pass" --> ER11["seasonal replay<br/>reflection · continue · play again"]
+  ER11 --> E9
+  F10 -- "stop watching" --> E9
 ```
+
+The fictional episode never overwrites IndexedDB records belonging to a personal garden. Its film advances through store actions on the presentation clock; hidden-tab intervals pause playback. The original ten-memory reference garden remains at `?demo`.
 
 ## 9. Frame pipeline
 

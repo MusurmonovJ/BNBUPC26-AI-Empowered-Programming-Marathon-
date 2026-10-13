@@ -45,3 +45,30 @@ export function relationKey(normalised: string): string {
   const r = BY_WORD.get(normalised);
   return r ? r.words[0] : normalised;
 }
+
+/* ---------- places with more than one name ---------- */
+
+/**
+ * Everyday places that are one place whatever they are called, so "home", "our homeplace" and "my house" thread
+ * together whichever tagger named them. Keys are compared after "my/our/the" and punctuation are stripped.
+ */
+export const PLACE_NAMES: { display: string; words: string[] }[] = [
+  { display: 'home', words: ['home', 'homeplace', 'home place', 'family home', 'childhood home', 'home house', 'homestead'] },
+];
+/** "my house", "our flat": a home named by what it is, only when it is mine or ours. */
+const OWN_HOME = /^(my|our)\s+(house|flat|apartment|place)$/;
+
+const PLACE_BY_WORD = new Map<string, { display: string; words: string[] }>();
+for (const p of PLACE_NAMES) for (const w of p.words) PLACE_BY_WORD.set(w, p);
+
+/** The everyday place a name refers to ("our homeplace" → home), if any. `raw` is the name before stripping. */
+export function placeOf(normalised: string, raw = ''): { display: string; words: string[] } | undefined {
+  if (OWN_HOME.test(raw.trim().toLowerCase().replace(/[’']s$/, ''))) return PLACE_NAMES[0];
+  return PLACE_BY_WORD.get(normalised);
+}
+
+/** Canonical matching key for a place ("homeplace" → "home"). */
+export function placeKey(normalised: string, raw = ''): string {
+  const p = placeOf(normalised, raw);
+  return p ? p.words[0] : normalised;
+}

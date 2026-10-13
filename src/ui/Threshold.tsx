@@ -17,15 +17,19 @@ export function Threshold() {
   const muted = useMuted();
   const [leaving, setLeaving] = useState<null | 'own' | 'demo' | 'story'>(null);
   const enter = useRef<HTMLButtonElement>(null);
+  const filmLink = new URLSearchParams(location.search).get('demo') === 'film';
   // Back at the threshold after letting the garden go: step in afresh.
   useEffect(() => { if (phase === 'threshold') { setLeaving(null); enter.current?.focus(); } }, [phase]);
 
   useEffect(() => {
     if (!leaving) return;
+    // The episode is prepared at the click, so as the threshold fades its seeds are already waiting in the dark; it is
+    // then only opened, never replaced by a garden that vanishes and regrows.
+    if (leaving !== 'own') useGarden.getState().beginEpisode(leaving === 'story' ? 'film' : 'play', LEAVE_MS);
     const t = setTimeout(() => {
       if (leaving === 'own') void useGarden.getState().enterOwn();
-      else if (leaving === 'story') startStory();
-      else useGarden.getState().seeDemo();
+      else if (leaving === 'story') startStory({ prepared: true });
+      else useGarden.getState().openEpisode();
     }, LEAVE_MS);
     return () => clearTimeout(t);
   }, [leaving]);
@@ -35,13 +39,13 @@ export function Threshold() {
     <div className={`threshold${leaving ? ' is-leaving' : ''}`}>
       {/* The whole screen is the way in. */}
       <button ref={enter} type="button" className="threshold-enter" aria-label="enter: plant something you don't want to lose"
-        onClick={() => setLeaving((l) => l ?? 'own')}>
+        onClick={() => setLeaving((l) => l ?? (filmLink ? 'story' : 'own'))}>
         <span className="threshold-seed" aria-hidden />
-        <span className="title-lg threshold-line">Plant something you don’t want to lose.</span>
-        <span className="interface-sm threshold-hint">click anywhere to enter{muted ? '' : ' · sound on'}</span>
+        <span className="title-lg threshold-line">{filmLink ? 'A life becomes a garden.' : 'Plant something you don’t want to lose.'}</span>
+        <span className="interface-sm threshold-hint">{filmLink ? 'click to watch a season' : 'click anywhere to enter'}{muted ? '' : ' · sound on'}</span>
       </button>
       <div className="threshold-demo">
-        <Button onClick={() => setLeaving((l) => l ?? 'demo')}>see a garden</Button>
+        <Button onClick={() => setLeaving((l) => l ?? 'demo')}>play a season</Button>
         <Button onClick={() => setLeaving((l) => l ?? 'story')}>watch a season</Button>
       </div>
     </div>
