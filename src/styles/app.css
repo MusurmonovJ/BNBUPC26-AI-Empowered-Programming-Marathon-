@@ -161,3 +161,14 @@ html, body, #root { height: 100%; overflow: hidden; }
 @keyframes caption-in { from { opacity: 0; filter: blur(6px); } to { opacity: 1; filter: blur(0); } }
 .episode-actions { bottom: 132px; }
 @media (prefers-reduced-motion: reduce) { .episode-caption-line, .film-title-line { animation: none; } }
+
+/* Language-only additions: existing type sizes, caption animation and garden styling stay intact. */
+.language-translation { display: block; font-family: "Microsoft YaHei", "PingFang SC", sans-serif; }
+.memory-translation { margin-top: var(--space-2); font-family: "Microsoft YaHei", "PingFang SC", sans-serif; }
+.language-choice { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.language-choice [aria-pressed="true"] { color: var(--text-primary); }
+.threshold-language { position: absolute; right: var(--space-4); bottom: var(--space-4); z-index: 2; }
+/* Keep the existing night band legible across both subtitle lines. */
+.episode-caption-line:has(.language-translation)::before, .film-title-line:has(.language-translation)::before {
+  mask-image: linear-gradient(to bottom, transparent, #000 20%, #000 80%, transparent);
+}

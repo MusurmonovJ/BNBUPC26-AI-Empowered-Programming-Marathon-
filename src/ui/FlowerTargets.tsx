@@ -8,8 +8,11 @@ import { useGarden } from '../store/garden';
 import { useLayout } from '../scene/useLayout';
 import { useFollow } from './useFollow';
 import { nameOf } from './whispers';
+import { useLanguage } from './language';
+import { memoryTranslation } from './translations';
 
 export function FlowerTargets() {
+  const { language, t } = useLanguage();
   const garden = useGarden((s) => s.garden);
   const views = useGarden((s) => s.views);
   const layout = useLayout();
@@ -35,11 +38,11 @@ export function FlowerTargets() {
   });
 
   return (
-    <div className="flower-targets" role="group" aria-label="the garden">
+    <div className="flower-targets" role="group" aria-label={t('the garden')}>
       {ids.map((id) => (
         <button key={id} type="button" className="flower-target" data-id={id}
           ref={(el) => { if (el) buttons.current.set(id, el); else buttons.current.delete(id); }}
-          aria-label={`${nameOf(garden.memories[id])} · ${views[id]?.state ?? ''}`}
+          aria-label={`${language === 'en' ? nameOf(garden.memories[id]) : memoryTranslation(garden.memories[id].text) ?? nameOf(garden.memories[id])} · ${t(views[id]?.state ?? '')}`}
           onFocus={() => hover(id)} onBlur={() => hover(null)} onClick={() => focus(id)} />
       ))}
     </div>

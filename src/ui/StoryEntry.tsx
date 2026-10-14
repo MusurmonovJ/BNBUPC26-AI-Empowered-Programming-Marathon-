@@ -3,15 +3,17 @@
 
 import { useGarden } from '../store/garden';
 import { startStory, stopStory } from './story';
+import { useLanguage } from './language';
 
 export function StoryEntry() {
+  const { t } = useLanguage();
   const running = useGarden((s) => s.story.running);
   const demo = useGarden((s) => s.owner === 'demo');
   if (!demo) return null;
   return (
     <button type="button" className="lt-btn is-text interface-sm story-entry" aria-pressed={running}
       onClick={() => (running ? stopStory() : startStory())}>
-      {running ? 'stop watching' : 'watch a season'}
+      {t(running ? 'stop watching' : 'watch a season')}
     </button>
   );
 }

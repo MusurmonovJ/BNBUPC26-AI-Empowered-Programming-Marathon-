@@ -8,6 +8,7 @@ import { useGarden } from '../store/garden';
 import { exportFile } from '../store/persist';
 import { Button, Overlay } from './ds';
 import { SoundToggle } from './SoundToggle';
+import { LanguageChoice, useLanguage } from './language';
 
 /** "lethe", top-left: the name is the way into settings. */
 export function SettingsEntry() {
@@ -29,6 +30,7 @@ export function Settings() {
 }
 
 function Main({ onLetGo }: { onLetGo: () => void }) {
+  const { t } = useLanguage();
   const first = useRef<HTMLButtonElement>(null);
   const [exporting, setExporting] = useState(false);
   useEffect(() => first.current?.focus(), []);
@@ -49,19 +51,20 @@ function Main({ onLetGo }: { onLetGo: () => void }) {
     <Overlay className="settings-overlay surface" title="Your garden" aria-label="your garden"
       actions={<Button onClick={closeSettings}>back to the garden</Button>}>
       <p className="interface settings-note">
-        Your memories stay in this browser. Connections are found here, on your device. If this garden has a tagging
-        service, only a memory’s words are sent to it, and nothing is stored.
+        {t('Your memories stay in this browser. Connections are found here, on your device. If this garden has a tagging service, only a memory’s words are sent to it, and nothing is stored.')}
       </p>
       <div className="settings-choices">
         <SoundToggle ref={first} />
         <Button onClick={() => void exportGarden()} disabled={exporting}>export my garden</Button>
         <Button onClick={onLetGo}>let the garden go</Button>
       </div>
+      <LanguageChoice />
     </Overlay>
   );
 }
 
 function LetGo({ onKeep }: { onKeep: () => void }) {
+  const { t } = useLanguage();
   const keepIt = useRef<HTMLButtonElement>(null);
   // Focus lands on keeping it, so Enter never lets a garden go by accident.
   useEffect(() => keepIt.current?.focus(), []);
@@ -71,7 +74,7 @@ function LetGo({ onKeep }: { onKeep: () => void }) {
         <Button ref={keepIt} onClick={onKeep}>keep the garden</Button>
         <Button variant="pill" onClick={() => void useGarden.getState().letGardenGo()}>let the garden go</Button>
       </>}>
-      <p className="interface settings-note">This deletes every memory from this browser.</p>
+      <p className="interface settings-note">{t('This deletes every memory from this browser.')}</p>
     </Overlay>
   );
 }

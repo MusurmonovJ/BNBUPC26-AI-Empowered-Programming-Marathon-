@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { useGarden } from '../store/garden';
 import { Whisper } from './ds';
 import { idleWhisper, returnWhisper } from './whispers';
+import { LanguageText } from './language';
 
 const SHOW_MS = 6000;
 /** Ignore pointer movement for a moment, so the whisper can be read before a twitch of the mouse hides it. */
@@ -43,11 +44,11 @@ export function GardenWhisper() {
   if (episode) {
     return (
       <p className={`lt-whisper ${story.running ? 'memory-lg' : 'memory'} episode-caption${visible ? '' : ' is-gone'}`} role="status">
-        <span key={line} className="episode-caption-line">{line}</span>
+        <span key={line} className="episode-caption-line"><LanguageText text={line} /></span>
       </p>
     );
   }
-  return <Whisper className="edge bottom-center whisper" visible={visible}>{line}</Whisper>;
+  return <Whisper className="edge bottom-center whisper" visible={visible}><LanguageText text={line} /></Whisper>;
 }
 
 /** The film's turning points: a title card in the empty sky above the garden (D26). */
@@ -55,5 +56,5 @@ export function FilmTitle() {
   const title = useGarden((s) => (s.story.running ? s.story.title ?? null : null));
   const phase = useGarden((s) => s.phase);
   if (!title || phase !== 'garden') return null;
-  return <p className="title film-title" aria-live="polite"><span key={title} className="film-title-line">{title}</span></p>;
+  return <p className="title film-title" aria-live="polite"><span key={title} className="film-title-line"><LanguageText text={title} /></span></p>;
 }

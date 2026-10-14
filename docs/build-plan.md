@@ -1,5 +1,10 @@
 # Build plan
 
+## Language-only contest update — authorized 14 October
+
+- [x] L1 Display-only English/Chinese/bilingual copy, language selection, authored memory translations, and unchanged film timing; verify tests, typecheck, all simulation modes, production build, and browser language/layout checks. Preserve unrelated recordings and presentation work. No gameplay, scene, audio, engine, tagging, or memory-data changes (D28).
+  - *Verified:* nine localization regression tests plus the existing suite, typecheck and production build pass. Simulations retain daily 25/25, lazy 14/16 and none 11/25. Full bilingual film completes both seasons in isolated Chrome and Edge at 1440 × 900, with no runtime exceptions or failed asset requests. Edge was repeated with background throttling disabled after its first unattended run stopped advancing. Existing presentation-clock behavior was preserved. Opening language selection does not start the film; Chinese fragments display translated words while retaining their original engine data. See `docs/release-check.md`.
+
 ## Contest episode — authorized 13 October
 
 Preserve the completed camera and shader warm-up work. Implement this scope in order; check a task only after its behavior tests and typechecking pass. Reference `?demo` and personal gardens retain their existing rules.

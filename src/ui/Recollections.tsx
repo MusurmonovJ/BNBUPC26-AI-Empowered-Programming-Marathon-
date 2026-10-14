@@ -7,6 +7,7 @@ import { C, type Memory, type MemoryState } from '../engine';
 import { useGarden } from '../store/garden';
 import { Button, Recollection } from './ds';
 import { useFollow } from './useFollow';
+import { useLanguage } from './language';
 
 const SPACE_3 = 16;
 const SPACE_4 = 24;
@@ -63,6 +64,7 @@ export function HoverRecollection() {
 }
 
 export function FocusRecollection() {
+  const { t } = useLanguage();
   const focusedId = useGarden((s) => s.focusedId);
   const view = useGarden((s) => (focusedId ? s.views[focusedId] : null));
   const light = useGarden((s) => s.garden.light);
@@ -83,14 +85,14 @@ export function FocusRecollection() {
   if (!m || !view) return null;
   const back = <Button onClick={() => focus(null)}>back to the garden</Button>;
   return (
-    <div ref={box} key={m.id} className="focus-recollection surface" role="dialog" aria-label={`memory · ${view.state}`}>
+    <div ref={box} key={m.id} className="focus-recollection surface" role="dialog" aria-label={t(`memory · ${view.state}`)}>
       <Recollection size="lg" text={m.text} seed={m.id} kind={m.kind} vitality={view.vitality} state={view.state}
         heldBy={heldByNames(m, view.state)} keywords={keywordsOf(m)}
         actions={view.state === 'lost'
           ? <><Button variant="pill" disabled={!editable || light < C.RETURN_COST} onClick={() => returnToMemory(m.id)}>return</Button>{back}</>
           : <><Button variant="pill" disabled={!editable || light < C.TEND_COST} onClick={() => tendMemory(m.id)}>tend</Button>
               <Button disabled={!editable} onClick={() => letGoMemory(m.id)}>let go</Button>{back}</>} />
-      {episode?.stage === 'exploring' && !light && <p className="interface-sm plant-note">your light has found its place. a season can pass when you are ready.</p>}
+      {episode?.stage === 'exploring' && !light && <p className="interface-sm plant-note">{t('your light has found its place. a season can pass when you are ready.')}</p>}
     </div>
   );
 }

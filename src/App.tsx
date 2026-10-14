@@ -21,8 +21,13 @@ import { TendMote } from './ui/TendMote';
 import { Threshold } from './ui/Threshold';
 import { useGardenKeys } from './ui/useGardenKeys';
 import { EpisodeControls } from './ui/EpisodeControls';
+import { LanguageProvider, useLanguage } from './ui/language';
 
 export function App() {
+  return <LanguageProvider><GardenApp /></LanguageProvider>;
+}
+
+function GardenApp() {
   // Fetch the offline tagger's NLP library in the background, so the first planting never waits for it.
   useEffect(preloadOfflineTagger, []);
   // Sound starts with the first click or key press (browsers need a gesture before audio).
@@ -73,6 +78,7 @@ function Light() {
  * as a return visit and plays the return replay; "reset demo garden" puts the ten sample memories back.
  */
 function TimeSlider() {
+  const { t, language } = useLanguage();
   const [open, setOpen] = useState(false);
   const offset = useGarden((s) => s.clock.debugOffset);
   const episode = useGarden((s) => s.episode);
@@ -86,12 +92,13 @@ function TimeSlider() {
   return (
     <div className="time-slider interface-sm">
       <label>
-        +{offset.toFixed(1)} garden days ({(offset / C.GARDEN_DAYS_PER_REAL_DAY).toFixed(1)} real)
+        {language === 'en' ? `+${offset.toFixed(1)} garden days (${(offset / C.GARDEN_DAYS_PER_REAL_DAY).toFixed(1)} real)`
+          : `+${offset.toFixed(1)} 花园日（${(offset / C.GARDEN_DAYS_PER_REAL_DAY).toFixed(1)} 现实日）`}
         <input type="range" min={0} max={42} step={0.5} value={offset} onChange={(e) => setDebugOffset(Number(e.target.value))} />
       </label>
       <div className="time-slider-actions">
-        <Button variant="pill" onClick={arrive}>arrive</Button>
-        <Button onClick={resetDemo}>reset demo garden</Button>
+        <Button variant="pill" onClick={arrive}>{t('arrive')}</Button>
+        <Button onClick={resetDemo}>{t('reset demo garden')}</Button>
       </div>
     </div>
   );

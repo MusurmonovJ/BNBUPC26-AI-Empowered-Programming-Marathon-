@@ -8,6 +8,8 @@ import { holders, numberWord, type Memory } from '../engine';
 import { useGarden, useRevealHeld } from '../store/garden';
 import { Button } from './ds';
 import { useFollow } from './useFollow';
+import { useLanguage } from './language';
+import { memoryTranslation } from './translations';
 
 /** The few that hold the most; a reveal, not a ledger. */
 const MAX_HOLDERS = 7;
@@ -20,6 +22,7 @@ export function RevealEntry() {
 }
 
 export function Reveal() {
+  const { t } = useLanguage();
   const reveal = useGarden((s) => s.reveal);
   const garden = useGarden((s) => s.garden);
   const views = useGarden((s) => s.views);
@@ -33,9 +36,9 @@ export function Reveal() {
   const strongest = ranked[0]?.weight || 1;
   return (
     <>
-      <nav className="reveal surface" aria-label="what holds your garden">
-        <h2 className="title reveal-title">What holds your garden</h2>
-        {ranked.length === 0 && <p className="interface reveal-empty">Nothing holds it yet. A memory with a person or a place in it would.</p>}
+      <nav className="reveal surface" aria-label={t('what holds your garden')}>
+        <h2 className="title reveal-title">{t('What holds your garden')}</h2>
+        {ranked.length === 0 && <p className="interface reveal-empty">{t('Nothing holds it yet. A memory with a person or a place in it would.')}</p>}
         <ul className="reveal-list">
           {ranked.map((h) => {
             const n = h.memories.length;
@@ -43,8 +46,8 @@ export function Reveal() {
               <li key={h.entityId}>
                 <button type="button" className={`reveal-holder${h.entityId === reveal.entityId ? ' is-on' : ''}`}
                   aria-pressed={h.entityId === reveal.entityId} onClick={() => selectHolder(h.entityId)}>
-                  <span className="reveal-name">{h.name}</span>
-                  <span className="interface-sm reveal-count">{numberWord(n)} {n === 1 ? 'memory' : 'memories'}</span>
+                  <span className="reveal-name">{t(h.name)}</span>
+                  <span className="interface-sm reveal-count">{t(`${numberWord(n)} ${n === 1 ? 'memory' : 'memories'}`)}</span>
                   {/* How much it holds, as a line of light: no number, no percentage. */}
                   <span className="reveal-line" aria-hidden style={{ width: `${Math.max(8, (h.weight / strongest) * 100)}%` }} />
                 </button>
@@ -69,6 +72,7 @@ export function revealLabel(m: Memory): string {
 }
 
 function RevealLabels() {
+  const { language } = useLanguage();
   const held = (useRevealHeld() ?? []).slice(0, 7);
   const garden = useGarden((s) => s.garden);
   const labels = useRef(new Map<string, HTMLSpanElement>());
@@ -103,9 +107,15 @@ function RevealLabels() {
       {held.map((id) => (
         <span key={id} className="interface-sm reveal-label surface" style={{ visibility: 'hidden' }}
           ref={(el) => { if (el) labels.current.set(id, el); else labels.current.delete(id); }}>
-          {revealLabel(garden.memories[id])}
+          {language === 'en' ? revealLabel(garden.memories[id]) : translatedRevealLabel(garden.memories[id])}
         </span>
       ))}
     </div>
   );
+}
+
+function translatedRevealLabel(m: Memory): string {
+  const text = memoryTranslation(m.text);
+  if (!text) return revealLabel(m);
+  return text.length > 24 ? `${text.slice(0, 22)}…` : text.replace(/。$/, '');
 }

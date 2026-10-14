@@ -51,6 +51,8 @@ Tagging works with no key: the offline tagger runs in the browser. Optional upgr
 
 ## Working style
 
+The owner authorized a **language-only** contest update on 14 October (D28): English, Simplified Chinese, and bilingual display copy. Do not change gameplay, memory data, tagging, timing, camera, graphics, audio, or persistence rules for localization. Original authored and personal memory text remains intact.
+
 The owner authorized the single-season contest episode on 13 October: a paused fictional demo, one remaining light, one pre-season planting, a 21-garden-day transition, and an acceptance ending. This lifts the feature freeze only for this scoped implementation. Personal time, privacy, engine formulas, and the completed performance fixes stay intact. The requested implementation spans the ordered episode tasks; finish the authorized scope, leaving each handoff green.
 
 - One small task per session; commit after each working step.

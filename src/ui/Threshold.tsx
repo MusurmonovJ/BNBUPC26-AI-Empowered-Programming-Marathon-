@@ -8,11 +8,13 @@ import { useGarden } from '../store/garden';
 import { Button } from './ds';
 import { useMuted } from './SoundToggle';
 import { startStory } from './story';
+import { LanguageChoice, LanguageText, useLanguage } from './language';
 
 /** The threshold fades away over this long once the person steps in. */
 const LEAVE_MS = 1200;
 
 export function Threshold() {
+  const { t } = useLanguage();
   const phase = useGarden((s) => s.phase);
   const muted = useMuted();
   const [leaving, setLeaving] = useState<null | 'own' | 'demo' | 'story'>(null);
@@ -38,16 +40,17 @@ export function Threshold() {
   return (
     <div className={`threshold${leaving ? ' is-leaving' : ''}`}>
       {/* The whole screen is the way in. */}
-      <button ref={enter} type="button" className="threshold-enter" aria-label="enter: plant something you don't want to lose"
+      <button ref={enter} type="button" className="threshold-enter" aria-label={t("enter: plant something you don't want to lose")}
         onClick={() => setLeaving((l) => l ?? (filmLink ? 'story' : 'own'))}>
         <span className="threshold-seed" aria-hidden />
-        <span className="title-lg threshold-line">{filmLink ? 'A life becomes a garden.' : 'Plant something you don’t want to lose.'}</span>
-        <span className="interface-sm threshold-hint">{filmLink ? 'click to watch a season' : 'click anywhere to enter'}{muted ? '' : ' · sound on'}</span>
+        <span className="title-lg threshold-line"><LanguageText text={filmLink ? 'A life becomes a garden.' : 'Plant something you don’t want to lose.'} /></span>
+        <span className="interface-sm threshold-hint">{t(filmLink ? 'click to watch a season' : 'click anywhere to enter')}{muted ? '' : ` · ${t('sound on')}`}</span>
       </button>
       <div className="threshold-demo">
         <Button onClick={() => setLeaving((l) => l ?? 'demo')}>play a season</Button>
         <Button onClick={() => setLeaving((l) => l ?? 'story')}>watch a season</Button>
       </div>
+      <LanguageChoice className="threshold-language" />
     </div>
   );
 }

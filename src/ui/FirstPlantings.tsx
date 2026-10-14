@@ -6,8 +6,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { FIRST_PROMPTS } from '../data/sample';
 import { useGarden } from '../store/garden';
 import { Button } from './ds';
+import { useLanguage } from './language';
 
 export function FirstPlantings() {
+  const { t } = useLanguage();
   const phase = useGarden((s) => s.phase);
   const index = useGarden((s) => s.promptIndex);
   const { plantPrompt, skipPrompt } = useGarden.getState();
@@ -26,8 +28,8 @@ export function FirstPlantings() {
   const plant = () => { if (text.trim()) void plantPrompt(text, photo ?? undefined); };
 
   return (
-    <section key={index} className="prompt-card lt-overlay surface" role="dialog" aria-label={prompt.prompt}>
-      <h2 className="prompt-title">{prompt.prompt}</h2>
+    <section key={index} className="prompt-card lt-overlay surface" role="dialog" aria-label={t(prompt.prompt)}>
+      <h2 className="prompt-title">{t(prompt.prompt)}</h2>
       {prompt.kind === 'photo' && (
         <div className="photo-pick">
           {photoUrl && <img src={photoUrl} alt="" className="photo-thumb" />}
@@ -35,12 +37,12 @@ export function FirstPlantings() {
           <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { setPhoto(e.target.files?.[0] ?? null); e.target.value = ''; }} />
         </div>
       )}
-      <textarea ref={input} className="memory prompt-input" rows={1} value={text} maxLength={280} aria-label="the memory"
-        placeholder={prompt.placeholder} onChange={(e) => setText(e.target.value.replace(/\n/g, ' '))}
+      <textarea ref={input} className="memory prompt-input" rows={1} value={text} maxLength={280} aria-label={t('the memory')}
+        placeholder={t(prompt.placeholder)} onChange={(e) => setText(e.target.value.replace(/\n/g, ' '))}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); plant(); } }} />
       <div className="prompt-footer">
         {/* Where you are among the seven, as points of light, not a progress bar. */}
-        <span className="prompt-dots" aria-label={`prompt ${index + 1} of ${FIRST_PROMPTS.length}`}>
+        <span className="prompt-dots" aria-label={t(`prompt ${index + 1} of ${FIRST_PROMPTS.length}`)}>
           {FIRST_PROMPTS.map((_, i) => <span key={i} className={`lt-light-dot${i < index ? ' is-lit' : ''}${i === index ? ' is-here' : ''}`} />)}
         </span>
         <Button onClick={skipPrompt}>skip</Button>

@@ -1,5 +1,18 @@
 # Contest release check
 
+## Language-only update — 14 October 2026
+
+English, Simplified Chinese, and bilingual display modes are available from the opening screen and existing settings, with direct `lang=en`, `lang=zh`, and `lang=bi` links. Bilingual film titles/captions and authored memory quotations retain their English text with Chinese alongside it. Other controls use the selected language; bilingual controls use Chinese. Visitors' own writing remains verbatim.
+
+- The full test suite, nine new language regression tests, typechecking, and the production build pass.
+- Simulations retain daily 25/25, lazy 14/16, and none 11/25.
+- Full bilingual films completed in isolated Chrome and Edge at 1440 × 900. Caption beats, both seasons, closing lines, and playable ending were checked. No runtime exceptions or failed requests occurred on these completed runs. Edge's first unattended run stopped progressing; the repeat with background throttling disabled passed. The application's clock was not changed.
+- Chinese opening, fragment selection, and readonly planting text were checked. Switching language on the opening does not start the film. Chinese ghost/lost quotations use the existing word-loss renderer rather than exposing the whole translation.
+- Diff checks confirm no changes to engine, store, scene, sound, tagging, server/API, authored data, film timeline, or the original word-loss rules. Styles added only support translated text and language selection. No new dependencies were added.
+- Existing recordings and the separate presentation prompt were left untouched.
+
+The report below describes the earlier 13 October release.
+
 Checked on 13 October 2026 for the three-minute film and playable episode release.
 
 ## Verification

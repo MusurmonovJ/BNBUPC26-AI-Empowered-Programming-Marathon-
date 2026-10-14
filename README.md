@@ -56,6 +56,14 @@ The three-minute film follows real garden actions through two visits to the same
 
 Use desktop Chrome or Edge with a window around 1440 × 900 or larger. Sound starts after your first interaction. Reduced-motion preferences are respected, and the experience remains understandable when muted.
 
+### Language / 语言
+
+Choose **english**, **中文**, or **english + 中文** on the opening screen or in the existing **lethe** settings. Bilingual mode pairs English and Simplified Chinese for film titles, captions, and authored demo memories. Controls use Chinese in that mode. The choice is remembered in this browser.
+
+[**中文体验**](https://lethe-nine.vercel.app/?demo=play&lang=zh) · [**English + 中文 film**](https://lethe-nine.vercel.app/?demo=film&lang=bi) · [**English film**](https://lethe-nine.vercel.app/?demo=film&lang=en)
+
+Translation changes display text only. Original memory words, tags, connections, seasonal outcomes, and visitors' own writing remain intact. Choose the language before starting the film.
+
 ## Your own garden and privacy
 
 - Personal gardens and photos live in this browser through IndexedDB. The fictional episode stays separate and never replaces your garden.
